@@ -1,0 +1,15 @@
+export const purple = "#890350";
+export const darkerpurple = "#5f0239";
+export const purpleTrans = "rgba(137,3,80,0.2)";
+export const orangeTrans = "rgba(248,134,14,0.55)";
+export const orange = "#f38713";
+export const lightOrange = "#fff3e7";
+export const lightGray = "#e6e6e6";
+export const gray = "#b4b4b4";
+export const lighterGray = "#e0e0e0";
+export const lighterMoreGray = "#f6f6f6";
+export const red = "#c9370f";
+export const green = "#56c211";
+export const white = "#fff";
+export const black = "#000";
+export const blackTrans = "rgba(0,0,0,0.9)";

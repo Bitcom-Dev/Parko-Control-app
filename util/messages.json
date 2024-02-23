@@ -1,0 +1,60 @@
+{
+  "en": {
+    "HomeScreen": {
+      "vehicle": "License Plate",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "zone": "Zone",
+      "paid": "Paid",
+      "parkingLot": "Parking Lot",
+      "noSession": "No active parking session!"
+    },
+    "AuthScreen": {
+      "login": "Login",
+      "register": "Register",
+      "username": "Username",
+      "password": "Password",
+      "welcome": "Welcome to Parko Control"
+    },
+    "LanguageScreen": {
+      "main": "Language",
+      "desc": "Preferred Language",
+      "title": "Select Preferred Language",
+      "status": "Change Language"
+    },
+    "SettingsScreen": {
+      "title": "Settings",
+      "language": "Language",
+      "logout": "Logout"
+    }
+  },
+  "ro": {
+    "HomeScreen": {
+      "vehicle": "Numar de inmatriculare",
+      "startTime": "Ora de inceput",
+      "endTime": "Ora de sfarsit",
+      "zone": "Zona",
+      "paid": "Platit",
+      "parkingLot": "Loc de parcare",
+      "noSession": "Nu exista sesiune de parcare activa!"
+    },
+    "AuthScreen": {
+      "login": "Conectare",
+      "register": "Inregistrare",
+      "username": "Nume Utilizator",
+      "password": "Parola",
+      "welcome": "Bine ai venit la Parko Control"
+    },
+    "LanguageScreen": {
+      "main": "Limba",
+      "desc": "Limba Preferata",
+      "title": "Selecteaza Limba Preferata",
+      "status": "Schimba Limba"
+    },
+    "SettingsScreen": {
+      "title": "Setari",
+      "language": "Limba",
+      "logout": "Deconectare"
+    }
+  }
+}
