@@ -61,7 +61,7 @@ export const CustomTextInput = forwardRef((props, ref) => (
   <TextInput
     {...props}
     ref={ref}
-    style={{ ...props.style, fontFamily: "Raleway_500Medium" }}
+    style={{ ...props.style, fontFamily: "Poppins_500Medium" }}
   />
 ));
 
@@ -183,7 +183,7 @@ export const CustomTextInputFloating = forwardRef((props, ref) => {
           onChange={onChange}
           onChangeText={onChangeText}
           ref={ref}
-          style={{ ...props.styleTextInput, fontFamily: "Raleway_500Medium", width: props.secureTextEntryToogle ? '90%' : '100%' }}
+          style={{ ...props.styleTextInput, fontFamily: "Poppins_500Medium", width: props.secureTextEntryToogle ? '90%' : '100%' }}
         />
         {props.secureTextEntryToogle && <TouchableOpacity onPress={handlePasswordVisibility}>
           <Ionicons name={rightIcon} size={Math.round((standardMin / 450) * 10) + 15} color={purple} style={{alignSelf: 'flex-end'}}/>

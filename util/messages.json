@@ -7,14 +7,23 @@
       "zone": "Zone",
       "paid": "Paid",
       "parkingLot": "Parking Lot",
-      "noSession": "No active parking session!"
+      "noSession": "No active parking session!",
+      "active": "Active Session",
+      "inactive": "Inactive Session",
+      "error": "Error",
+      "connectionError": "There was a communication error with the server! Please try again later!",
+      "noUser": "No user found to verify!"
     },
     "AuthScreen": {
       "login": "Login",
       "register": "Register",
       "username": "Username",
       "password": "Password",
-      "welcome": "Welcome to Parko Control"
+      "welcome": "Welcome to Parko Control",
+      "error": "Error",
+      "invalidCredentials": "Invalid username or password!",
+      "deactivatedUser": "Your account has been deactivated!",
+      "connectionError": "There was a communication error with the server! Please try again later!"
     },
     "LanguageScreen": {
       "main": "Language",
@@ -22,10 +31,15 @@
       "title": "Select Preferred Language",
       "status": "Change Language"
     },
+    "HistoryScreen": {
+      "main": "History",
+      "desc": "Here you can find the latest verifications!"
+    },
     "SettingsScreen": {
       "title": "Settings",
       "language": "Language",
-      "logout": "Logout"
+      "logout": "Logout",
+      "history": "History"
     }
   },
   "ro": {
@@ -36,14 +50,23 @@
       "zone": "Zona",
       "paid": "Platit",
       "parkingLot": "Loc de parcare",
-      "noSession": "Nu exista sesiune de parcare activa!"
+      "noSession": "Nu exista sesiune de parcare activa!",
+      "active": "Sesiune Activa",
+      "inactive": "Sesiune Inactiva",
+      "error": "Eroare",
+      "connectionError": "A existat o eroare de comunicare cu serverul! Va rugam incercati mai tarziu!",
+      "noUser": "Nu s-a gasit niciun utilizator pentru verificare!"
     },
     "AuthScreen": {
       "login": "Conectare",
       "register": "Inregistrare",
       "username": "Nume Utilizator",
       "password": "Parola",
-      "welcome": "Bine ai venit la Parko Control"
+      "welcome": "Bine ai venit la Parko Control",
+      "error": "Eroare",
+      "invalidCredentials": "Nume de utilizator sau parola incorecte!",
+      "deactivatedUser": "Contul tau a fost dezactivat!",
+      "connectionError": "A existat o eroare de comunicare cu serverul! Va rugam incercati mai tarziu!"
     },
     "LanguageScreen": {
       "main": "Limba",
@@ -51,10 +74,15 @@
       "title": "Selecteaza Limba Preferata",
       "status": "Schimba Limba"
     },
+    "HistoryScreen": {
+      "main": "Istoric",
+      "desc": "Aici poti gasi ultimele verificari!"
+    },
     "SettingsScreen": {
       "title": "Setari",
       "language": "Limba",
-      "logout": "Deconectare"
+      "logout": "Deconectare",
+      "history": "Istoric"
     }
   }
 }

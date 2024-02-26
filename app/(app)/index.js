@@ -1,10 +1,10 @@
-import { Link, Stack } from "expo-router";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Link, Stack, router } from "expo-router";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Feather } from '@expo/vector-icons';
 import { resize, general } from "../../util/style";
-import { black, purple, red, white } from "../../util/colors";
-import { CustomTextInputFloating, CustomTextMedium, CustomTextRegular } from "../../util/CustomText";
-import { useState } from "react";
+import { black, green, purple, red, white } from "../../util/colors";
+import { CustomTextBold, CustomTextInputFloating, CustomTextMedium, CustomTextRegular } from "../../util/CustomText";
+import { useEffect, useState } from "react";
 import { useMessage } from "../../util/messages";
 import { controlInstance } from "../../util/instances";
 import { useAuth } from "../../context/userContext";
@@ -46,14 +46,22 @@ export default function Index() {
 		controlInstance(auth).get(`/${vehicle}`)
 		.then(response => {
 			setLoading(false);
-			console.log(response.data);
 			setSession(response.data);
 		})
 		.catch(error => {
 			setLoading(false);
 			console.log(error);
+			setSession(undefined);
+			if (error.response && error.response.status === 403){
+				Alert.alert(strings.error, strings.noUser);
+				auth.signOut();
+				router.replace('/signIn');
+			}
+			else if (error.response && (error.response.status === 400 || error.response.status === 500))
+				Alert.alert(strings.error, strings.connectionError);
 		});
     };
+	
     return (
         <ScrollView contentContainerStyle={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center' }}>
             <Stack.Screen 
@@ -68,7 +76,8 @@ export default function Index() {
             }}/>
             <CustomTextInputFloating
                 value={vehicle}
-				onChangeText={setVehicle}
+				autoCapitalize = {"characters"}
+				onChangeText={(e) => setVehicle(e.trim().toUpperCase())}
 				style={{...general.fontSize14, width: "85%", marginVertical: resize(50)}}
 				styleTextInput={{ ...general.fontSize14, color: black }}
 				selectionColor={purple}
@@ -78,71 +87,77 @@ export default function Index() {
                 onBlur={verifyVehicle}
 				editable={!loading}
             />
-            {session !== null && (loading ?
+            { session !== null && loading === true &&
                 <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', width: '100%'}}>
                     <ActivityIndicator size="large" color={purple}/>
-                </View> 
-                : 
-                (
-                    session ?
-                        <View style={{flexGrow: 1, justifyContent: 'flex-start', alignItems: 'flex-start', width: '100%', gap: resize(5)}}>
-                            {session.vehicle && <View style={{marginHorizontal: resize(40)}}>
-                                <CustomTextMedium style={{...general.fontSize14}}>
-									{strings.vehicle} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{session.vehicle}
-								</CustomTextRegular>
-                            </View>}
-							{session.startTime && <View style={{marginHorizontal: resize(40)}}>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{strings.startTime} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{formatDate(session.startTime)}
-								</CustomTextRegular>
-							</View>}
-							{session.endTime && <View style={{marginHorizontal: resize(40)}}>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{strings.endTime} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{formatDate(session.endTime)}
-								</CustomTextRegular>
-							</View>}
-							{session.zone && <View style={{marginHorizontal: resize(40)}}>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{strings.zone} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{session.zone}
-								</CustomTextRegular>
-							</View>}
-							{session.parkingLot && <View style={{marginHorizontal: resize(40)}}>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{strings.parkingLot} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{session.parkingLot}
-								</CustomTextRegular>
-							</View>}
-							{session.paid && <View style={{marginHorizontal: resize(40)}}>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{strings.paid} :
-								</CustomTextMedium>
-								<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
-									{session.paid} RON
-								</CustomTextRegular>
-							</View>}
-                        </View>
-                    :
-                        <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center'}}>
-                            <CustomTextMedium style={{...general.fontSize16, textAlign: 'center'}}>
-								{strings.noSession}
-							</CustomTextMedium>
-                        </View>
-                )
-            )}
+                </View>
+
+			} 
+			{ session !== null && !loading &&
+				<View style={{backgroundColor: session ? green : red, width: "85%", paddingVertical: resize(15), justifyContent: 'center', alignItems: 'center', borderRadius: resize(20), marginBottom: resize(30)}}>
+					<CustomTextBold style={{...general.fontSize16}}>
+						{session ? strings.active : strings.inactive}
+					</CustomTextBold>
+				</View>
+			}
+			{ session !== null && session !== undefined && !loading &&
+				<View style={{flexGrow: 1, justifyContent: 'flex-start', alignItems: 'flex-start', width: '100%', gap: resize(5)}}>
+					{session.vehicle && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.vehicle} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{session.vehicle}
+						</CustomTextRegular>
+					</View>}
+					{session.startTime && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.startTime} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{formatDate(session.startTime)}
+						</CustomTextRegular>
+					</View>}
+					{session.endTime && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.endTime} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{formatDate(session.endTime)}
+						</CustomTextRegular>
+					</View>}
+					{session.zone && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.zone} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{session.zone}
+						</CustomTextRegular>
+					</View>}
+					{session.parkingLot && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.parkingLot} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{session.parkingLot}
+						</CustomTextRegular>
+					</View>}
+					{session.paid && <View style={{marginHorizontal: resize(40)}}>
+						<CustomTextMedium style={{...general.fontSize14}}>
+							{strings.paid} :
+						</CustomTextMedium>
+						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
+							{session.paid} RON
+						</CustomTextRegular>
+					</View>}
+				</View> 
+			}
+			{ session === undefined && !loading && <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center'}}>
+					<CustomTextMedium style={{...general.fontSize16, textAlign: 'center'}}>
+						{strings.noSession}
+					</CustomTextMedium>
+				</View> 
+			}
 
         </ScrollView>
     );

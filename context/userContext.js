@@ -97,7 +97,7 @@ export const SessionProvider = ({children}) => {
 	  useEffect(() => {
 		if (accessToken === null) {
 		  retrieveValue("accessToken", setAccessToken);
-		} else if (user === undefined) {
+		} else if (accessToken === undefined) {
 		  removeValue("accessToken");
 		} else {
 		  saveValue("accessToken", accessToken);
@@ -107,7 +107,7 @@ export const SessionProvider = ({children}) => {
 	  useEffect(() => {
 		if (refreshToken === null) {
 		  retrieveValue("refreshToken", setRefreshToken);
-		} else if (user === undefined) {
+		} else if (refreshToken === undefined) {
 		  removeValue("refreshToken");
 		} else {
 		  saveValue("refreshToken", refreshToken);

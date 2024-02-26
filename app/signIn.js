@@ -1,4 +1,4 @@
-import { ActivityIndicator, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useAuth, useSession } from '../context/userContext';
 import { useEffect, useRef, useState } from 'react';
 import { black, purple, white } from '../util/colors';
@@ -31,7 +31,13 @@ export default function SignIn() {
 		})
 		.catch(error => {
 			setLoading(false);
-			console.error(error);
+			console.log(error);
+			if (error.response && (error.response.status === 401 || error.response.status === 404))
+				Alert.alert(strings.error, strings.invalidCredentials);
+			else if (error.response && error.response.status === 403)
+				Alert.alert(strings.error, strings.deactivatedUser);
+			else if (error.response && error.response.status === 400)
+				Alert.alert(strings.error, strings.connectionError);
 		});
 	};
 
@@ -60,7 +66,7 @@ export default function SignIn() {
 				selectionColor={purple}
 				label={strings.password}
 				secureTextEntryToogle={true}
-				onSubmitEditing={signIn}
+				onSubmitEditing={login}
 			/>
 			<TouchableOpacity activeOpacity={.7} onPress={login} style={{ width: "80%", marginVertical: resize(50), paddingVertical: resize(15), backgroundColor: purple, borderRadius: resize(10), justifyContent: 'center', alignItems: 'center', flexDirection: 'row'}}> 
 				<CustomTextMedium style={{...general.fontSize16, color: white, letterSpacing: resize(4)}}>
