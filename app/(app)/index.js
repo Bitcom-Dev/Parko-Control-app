@@ -87,76 +87,79 @@ export default function Index() {
                 onBlur={verifyVehicle}
 				editable={!loading}
             />
-            { session !== null && loading === true &&
+            { session !== null && loading === true ?
                 <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', width: '100%'}}>
                     <ActivityIndicator size="large" color={purple}/>
                 </View>
-
+				: null
 			} 
-			{ session !== null && !loading &&
+			{ session !== null && !loading ?
 				<View style={{backgroundColor: session ? green : red, width: "85%", paddingVertical: resize(15), justifyContent: 'center', alignItems: 'center', borderRadius: resize(20), marginBottom: resize(30)}}>
 					<CustomTextBold style={{...general.fontSize16}}>
 						{session ? strings.active : strings.inactive}
 					</CustomTextBold>
 				</View>
+				: null
 			}
-			{ session !== null && session !== undefined && !loading &&
+			{ session !== null && session !== undefined && !loading ?
 				<View style={{flexGrow: 1, justifyContent: 'flex-start', alignItems: 'flex-start', width: '100%', gap: resize(5)}}>
-					{session.vehicle && <View style={{marginHorizontal: resize(40)}}>
+					{session.vehicle ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.vehicle} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{session.vehicle}
 						</CustomTextRegular>
-					</View>}
-					{session.startTime && <View style={{marginHorizontal: resize(40)}}>
+					</View> : null}
+					{session.startTime ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.startTime} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{formatDate(session.startTime)}
 						</CustomTextRegular>
-					</View>}
-					{session.endTime && <View style={{marginHorizontal: resize(40)}}>
+					</View> : null}
+					{session.endTime ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.endTime} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{formatDate(session.endTime)}
 						</CustomTextRegular>
-					</View>}
-					{session.zone && <View style={{marginHorizontal: resize(40)}}>
+					</View> : null}
+					{session.zone ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.zone} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{session.zone}
 						</CustomTextRegular>
-					</View>}
-					{session.parkingLot && <View style={{marginHorizontal: resize(40)}}>
+					</View> : null}
+					{session.parkingLot ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.parkingLot} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{session.parkingLot}
 						</CustomTextRegular>
-					</View>}
-					{session.paid && <View style={{marginHorizontal: resize(40)}}>
+					</View> : null}
+					{session.paid ? <View style={{marginHorizontal: resize(40)}}>
 						<CustomTextMedium style={{...general.fontSize14}}>
 							{strings.paid} :
 						</CustomTextMedium>
 						<CustomTextRegular style={{...general.fontSize14, marginLeft: resize(25)}}>
 							{session.paid} RON
 						</CustomTextRegular>
-					</View>}
+					</View> : null}
 				</View> 
+				: null
 			}
-			{ session === undefined && !loading && <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center'}}>
+			{ session === undefined && !loading ? <View style={{flexGrow: 1, justifyContent: 'center', alignItems: 'center'}}>
 					<CustomTextMedium style={{...general.fontSize16, textAlign: 'center'}}>
 						{strings.noSession}
 					</CustomTextMedium>
 				</View> 
+				: null
 			}
 
         </ScrollView>

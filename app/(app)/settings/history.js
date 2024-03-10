@@ -1,18 +1,70 @@
 import { Stack } from 'expo-router';
-import React, { useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView, ActivityIndicator} from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
-import { useSession } from '../../../context/userContext';
+import { useAuth, useSession } from '../../../context/userContext';
 import { useMessage } from '../../../util/messages';
-import { Entypo, Octicons } from '@expo/vector-icons';
-import { black, gray, green, lightOrange, white } from '../../../util/colors';
+import { AntDesign } from '@expo/vector-icons';
+import { black, gray, green, lightOrange, purple, red, white } from '../../../util/colors';
 import { resize, standardMin, general } from '../../../util/style';
-
+import { FlashList } from "@shopify/flash-list";
+import { controlInstance } from '../../../util/instances';
 
 export default History = () => {
     const { HistoryScreen: strings } = useMessage();
+    const [DATA, setDATA] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const auth = useAuth();
+    const Verification = (props) => {
+        const timestampToString = (ts) => {
+            const date = new Date(ts);
+          
+            const year = date.getFullYear();
+            const month = ('0' + (date.getMonth() + 1)).slice(-2); // Months are 0-based in JavaScript
+            const day = ('0' + date.getDate()).slice(-2);
+            const hours = ('0' + date.getHours()).slice(-2);
+            const minutes = ('0' + date.getMinutes()).slice(-2);
+          
+            const dateString = `${hours}:${minutes} ${day}-${month}-${year} `;
+          
+            return dateString;
+          }
+
+        return (
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(10)}}>
+                <View style={{flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: white, width: '90%', paddingVertical: resize(10), paddingHorizontal: resize(20), borderRadius: resize(15), gap: resize(5)}}>
+                    <View style={{flexDirection: 'row',alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+                        <CustomTextMedium style={{...general.fontSize14}}>
+                            {props.vehicle}
+                        </CustomTextMedium>
+                        <AntDesign name={props.active ? "checkcircle" : "closecircle"} size={resize(35)} color={props.active ? green : red} />
+                    </View>
+                    <CustomTextRegular style={{...general.fontSize10, alignSelf: 'flex-end'}}>
+                        {timestampToString(props.ts * 1000)}
+                    </CustomTextRegular>
+                </View>
+            </View>
+        );
+    };
+    const loadData = () => {
+        setLoading(true);
+        controlInstance(auth).get('/history', {params: {offset: DATA.length}})
+        .then(response => {
+            setDATA(DATA.concat(response.data));
+        })
+        .catch(error => {
+            console.log(error);
+        })
+        .finally(() => {
+            setLoading(false);
+        });
+    }
+    useEffect(() => {
+      loadData();
+    }, [])
+    
     return (
-        <ScrollView>
+        <ScrollView contentContainerStyle={{ flex: 1 }}>
             <Stack.Screen 
                 options={{
                     title: "",
@@ -28,7 +80,14 @@ export default History = () => {
                 <CustomTextMedium style={styles.mainText}>{strings.main}</CustomTextMedium>
                 <CustomTextBold style={styles.descriptionText}>{strings.desc}</CustomTextBold>
             </View>
-            
+            <FlashList
+                data={DATA}
+                renderItem={({ item }) => <Verification {...item} />}
+                estimatedItemSize={resize(100)}
+                onEndReached={loadData}
+                onEndReachedThreshold={.1}
+                ListFooterComponent={loading ? <ActivityIndicator size="large" color={purple} /> : null}
+            />
         </ScrollView>
     );
 }
