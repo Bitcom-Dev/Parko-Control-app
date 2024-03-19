@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { useState, forwardRef, useRef, useEffect } from "react";
 import { gray, purple } from "./colors";
-import { standardMin } from "./style";
+import { resize, standardMin } from "./style";
 import { Ionicons } from '@expo/vector-icons';
 
 export const CustomReadMore = (props) => {
@@ -130,11 +130,12 @@ export const CustomTextInputFloating = forwardRef((props, ref) => {
 
   }, [props.value])
   
-
-  const [ passwordVisibility, rightIcon, handlePasswordVisibility ] = useTogglePasswordVisibility();
+ 
+  const [ passwordVisibility, rightIcon, handlePasswordVisibility ] = props.secureTextEntryToogle ? useTogglePasswordVisibility() : [false, props.rightIcon, () => {}];
+  
   
   return (
-    <View style={{ ...props.style, borderBottomWidth: 2 }} onLayout={onLayout}>
+    <View style={{ ...props.style, borderBottomWidth: 2, borderBottomColor: gray }} onLayout={onLayout}>
       <Animated.Text
         style={{
           ...props.styleTextInput,
@@ -147,7 +148,7 @@ export const CustomTextInputFloating = forwardRef((props, ref) => {
       >
         {props.label}
       </Animated.Text>
-      <View style={props.secureTextEntryToogle ? {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'} : {}}>
+      <View style={props.secureTextEntryToogle || props.rightIcon ? {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'} : {}}>
         <TextInput
           {...props}
           secureTextEntry={props.secureTextEntryToogle ? passwordVisibility : false}
@@ -183,11 +184,15 @@ export const CustomTextInputFloating = forwardRef((props, ref) => {
           onChange={onChange}
           onChangeText={onChangeText}
           ref={ref}
-          style={{ ...props.styleTextInput, fontFamily: "Poppins_500Medium", width: props.secureTextEntryToogle ? '90%' : '100%' }}
+          style={{ ...props.styleTextInput, fontFamily: "Poppins_500Medium", width: props.secureTextEntryToogle || props.rightIcon ? '85%' : '100%' }}
         />
         {props.secureTextEntryToogle && <TouchableOpacity onPress={handlePasswordVisibility}>
-          <Ionicons name={rightIcon} size={Math.round((standardMin / 450) * 10) + 15} color={purple} style={{alignSelf: 'flex-end'}}/>
-        </TouchableOpacity>}
+          <Ionicons name={rightIcon} size={Math.round((standardMin / 450) * 10) + 15} color={passwordVisibility ? gray : purple} style={{alignSelf: 'flex-end'}}/>
+        </TouchableOpacity>
+        }
+        {props.rightIcon && 
+          <Ionicons name={rightIcon} size={props.rightIconSize || Math.round((standardMin / 450) * 10) + 15} color={props.rightIconColor || gray} style={{alignSelf: 'flex-end', marginBottom: props.rightIconBottom || resize(5), borderRadius: resize(20), overflow: 'hidden', marginRight: props.rightIconRight}}/>
+        }
       </View>
     </View>
   );

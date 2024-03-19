@@ -1,6 +1,6 @@
 import { Redirect, Stack } from 'expo-router';
 import { useSession } from '../../context/userContext';
-import { purple } from '../../util/colors';
+import { black, purple, white } from '../../util/colors';
 
 export default function Root() {
 	const { isLoggedIn } = useSession();
@@ -13,15 +13,15 @@ export default function Root() {
         <Stack 
 			screenOptions={{
 				headerStyle: {
-					backgroundColor: purple,
+					backgroundColor: white,
 				},
-				headerTintColor: '#fff',
+				headerTintColor: black,
 				headerTitleAlign: 'center',
 				headerTitleStyle: {
-					fontWeight: 'bold',
+					fontFamily: 'Poppins_500Medium',
 				},
-				statusBarColor: purple,
-				statusBarStyle: 'light',
+				statusBarColor: white,
+				statusBarStyle: 'dark',
 				title: "Parko Control",
                 statusBarAnimation: 'fade'
 		  	}}

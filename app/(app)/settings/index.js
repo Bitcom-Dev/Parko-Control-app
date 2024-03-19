@@ -16,21 +16,21 @@ export default Index = () => {
                 <Feather name="user" size={resize(80)} color={purple} style={{borderColor: purple, borderWidth: resize(2), borderRadius: resize(15), paddingLeft: resize(5)}}/>
                 <View>
                     <CustomTextMedium style={{...general.fontSize16}}>
-                        {user.fullName}
+                        {user?.fullName}
                     </CustomTextMedium>
                     <CustomTextRegular style={{...general.fontSize12}}>
-                        {user.username}
+                        {user?.username}
                     </CustomTextRegular>
                 </View>
             </View>
-            <Link href={"/settings/history"} asChild>
+            {/* <Link href={"/settings/history"} asChild>
                 <TouchableOpacity style={{width: "85%", justifyContent: 'flex-start', alignItems: 'center', paddingTop: resize(20), paddingBottom: resize(5), borderBottomColor: gray, borderBottomWidth: resize(2), flexDirection: 'row', gap: resize(10), paddingHorizontal: resize(10)}}>
                     <MaterialIcons name="history" size={resize(30)} color={purple} />
                     <CustomTextMedium style={{...general.fontSize14}}>
                         {strings.history}
                     </CustomTextMedium>
                 </TouchableOpacity>
-            </Link>
+            </Link> */}
 
             <Link href={"/settings/language"} asChild>
                 <TouchableOpacity style={{width: "85%", justifyContent: 'flex-start', alignItems: 'center', paddingTop: resize(20), paddingBottom: resize(5), borderBottomColor: gray, borderBottomWidth: resize(2), flexDirection: 'row', gap: resize(10), paddingHorizontal: resize(10)}}>

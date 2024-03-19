@@ -27,7 +27,7 @@ export const SessionProvider = ({children}) => {
     const [isLoggedIn, setLoggedIn] = useState(false);
     const [accessToken, setAccessToken] = useState(null);
     const [refreshToken, setRefreshToken] = useState(null);
-    const [language, setLanguage] = useState("en");
+    const [language, setLanguage] = useState("ro");
     const [uuid, setUUID] = useState(null);
     const [user, setUser] = useState(null);
 
@@ -67,7 +67,7 @@ export const SessionProvider = ({children}) => {
 	
 	  useEffect(() => {
 		if (language === null) {
-		  retrieveValue("language", (e) => setLanguage(e ? e : "en"));
+		  retrieveValue("language", (e) => setLanguage(e ? e : "ro"));
 		} else {
 		  saveValue("language", language);
 		}

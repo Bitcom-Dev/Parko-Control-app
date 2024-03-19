@@ -47,6 +47,8 @@ export default History = () => {
         );
     };
     const loadData = () => {
+        if (loading)
+            return;
         setLoading(true);
         controlInstance(auth).get('/history', {params: {offset: DATA.length}})
         .then(response => {
