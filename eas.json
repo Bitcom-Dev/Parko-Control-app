@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 7.2.0"
+  },
+  "build": {
+    "development": {
+      "channel": "development",
+      "env": {
+        "baseURL": "https://control.parko.ai/api/"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "env": {
+        "baseURL": "https://control.parko.ai/api/"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "companyName": "SC BITCOM SRL"
+      }
+    }
+  }
+}

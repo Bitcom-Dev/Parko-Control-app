@@ -1,7 +1,7 @@
 module.exports = ({ config }) => {
   config.extra = {
     ...config.extra,
-    baseURL: process.env.baseURL ?? "http://192.168.0.105:5000/",
+    baseURL: process.env.baseURL ?? "https://control.parko.ai/api/",
   };
   return {
     ...config,

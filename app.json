@@ -12,20 +12,33 @@
       "resizeMode": "contain",
       "backgroundColor": "#890350"
     },
+    "runtimeVersion": {
+      "policy": "nativeVersion"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bitcom.parkocontrol.bordeac03",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#890350"
-      }
+      },
+      "package": "com.bitcom.parkocontrol.bordeac03",
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2fa64f0c-98bb-472a-a2a8-b0f4b92a2c14"
+      }
     }
   }
 }
