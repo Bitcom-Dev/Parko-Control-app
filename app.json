@@ -26,7 +26,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#890350"
+        "backgroundColor": "#fff"
       },
       "package": "com.bitcom.parkocontrol.bordeac03",
       "versionCode": 1,
@@ -39,6 +39,19 @@
       "eas": {
         "projectId": "2fa64f0c-98bb-472a-a2a8-b0f4b92a2c14"
       }
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ]
+    ]
   }
 }

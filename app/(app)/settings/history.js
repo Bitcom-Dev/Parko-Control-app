@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView, ActivityIndicator} from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
@@ -15,6 +15,7 @@ export default History = () => {
     const [DATA, setDATA] = useState([]);
     const [loading, setLoading] = useState(false);
     const auth = useAuth();
+    const router = useRouter();
     const Verification = (props) => {
         const timestampToString = (ts) => {
             const date = new Date(ts);
@@ -31,7 +32,7 @@ export default History = () => {
           }
 
         return (
-            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(10)}}>
+            <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(10)}} activeOpacity={.7} onPress={() => router.push({pathname: "/", params: {vehicleSelected: props.vehicle, tsSelected: props.ts , details: JSON.stringify({...props.details, active: props.active})}})}>
                 <View style={{flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: white, width: '90%', paddingVertical: resize(10), paddingHorizontal: resize(20), borderRadius: resize(15), gap: resize(5)}}>
                     <View style={{flexDirection: 'row',alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
                         <CustomTextMedium style={{...general.fontSize14}}>
@@ -43,7 +44,7 @@ export default History = () => {
                         {timestampToString(props.ts * 1000)}
                     </CustomTextRegular>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
     const loadData = () => {

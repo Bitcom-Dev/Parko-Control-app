@@ -50,6 +50,21 @@
       "language": "Language",
       "logout": "Logout",
       "history": "History"
+    },
+    "CameraScreen": {
+      "title": "Camera",
+      "desc": "Scan the license plate!",
+      "permission": "Camera permission required",
+      "request": "Request Permission",
+      "history": "Scanned License Plates - History",
+      "days": "Days",
+      "hours": "Hours",
+      "minutes": "Minutes",
+      "now": "Now",
+      "weeks": "Weeks",
+      "months": "Months",
+      "years": "Years",
+      "overtime": "Overtime"
     }
   },
   "ro": {
@@ -103,6 +118,21 @@
       "language": "Limba",
       "logout": "Deconectare",
       "history": "Istoric"
+    },
+    "CameraScreen": {
+      "title": "Camera",
+      "desc": "Scaneaza numarul de inmatriculare!",
+      "permission": "Permisiunea camerei este necesara",
+      "request": "Cerere Permisiune",
+      "history": "Numere de inmatriculare scanate - Istoric",
+      "days": "Zile",
+      "hours": "Ore",
+      "minutes": "Minute",
+      "now": "Acum",
+      "weeks": "Saptamani",
+      "months": "Luni",
+      "years": "Ani",
+      "overtime": "Depasire"
     }
   }
 }

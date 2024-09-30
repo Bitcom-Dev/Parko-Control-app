@@ -1,10 +1,10 @@
-import { Link, Stack, router } from "expo-router";
+import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons, MaterialIcons, AntDesign, FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resize, general } from "../../util/style";
 import { black, gray, green, orange, purple, red, white } from "../../util/colors";
 import { CustomTextBold, CustomTextInputFloating, CustomTextMedium, CustomTextRegular } from "../../util/CustomText";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMessage } from "../../util/messages";
 import { controlInstance } from "../../util/instances";
 import { useAuth } from "../../context/userContext";
@@ -12,10 +12,12 @@ import { FlashList } from "@shopify/flash-list";
 
 export default function Index() {
     const { HomeScreen: strings } = useMessage();
-    const [vehicle, setVehicle] = useState("");
     const [loading, setLoading] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
-    const [session, setSession] = useState(null);
+	const { vehicleSelected="", details=null, tsSelected } = useLocalSearchParams();
+    const [vehicle, setVehicle] = useState(vehicleSelected);
+    const [ts, setTs] = useState(tsSelected);
+    const [session, setSession] = useState(JSON.parse(details));
 	const [history, setHistory] = useState([]);
 	const auth = useAuth();
 
@@ -36,9 +38,11 @@ export default function Index() {
 		});
 	}
 
-    useEffect(() => {
-      loadData();
-    }, []);
+    useFocusEffect(
+		useCallback(() => {
+			loadData();
+		}, [])
+	);
 
 	function formatDate(dateString) {
 		const date = new Date(dateString);
@@ -129,6 +133,7 @@ export default function Index() {
 			setSession(null);
             return;
 		}
+		setTs(undefined);
         setLoading(true);
 		setSession(undefined);
 		controlInstance(auth).get(`/${vehicle}`)
@@ -160,7 +165,7 @@ export default function Index() {
 
 	const HistoryPlate = (props) => {
 		return (
-			<TouchableOpacity activeOpacity={0.7} style={{flexDirection: 'row', marginHorizontal: resize(20), borderBottomColor: gray, borderBottomWidth: resize(2), marginVertical: resize(10), alignItems: 'flex-end', gap: resize(10), paddingHorizontal: resize(10)}}>
+			<TouchableOpacity activeOpacity={0.7} style={{flexDirection: 'row', marginHorizontal: resize(20), borderBottomColor: gray, borderBottomWidth: resize(2), marginVertical: resize(10), alignItems: 'flex-end', gap: resize(10), paddingHorizontal: resize(10)}} onPress={() => {setVehicle(props.vehicle);setSession({...props.details, active: props.active});setTs(props.ts);}}>
 				<View style={{flexGrow: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
 					<CustomTextMedium style={{...general.fontSize12, color: black}}>
 						{props.vehicle}
@@ -185,6 +190,13 @@ export default function Index() {
                         </TouchableOpacity>
                     </Link>
                 ),
+				headerLeft: () => (
+					<Link href="/camera" asChild>
+                        <TouchableOpacity style={{borderRadius: resize(20), overflow: 'hidden'}}>
+                            <Ionicons name="camera" size={resize(35)} color={purple} />
+                        </TouchableOpacity>
+                    </Link>
+				),
             }}/>
             <CustomTextInputFloating
                 value={vehicle}
@@ -215,10 +227,10 @@ export default function Index() {
 			} 
 			{ session !== null && !loading ?
 				<View style={{backgroundColor: session?.active ? green : orange, width: "85%", paddingTop: resize(10), paddingBottom: resize(5), justifyContent: 'center', alignItems: 'flex-end', borderRadius: resize(20), marginBottom: resize(30), flexDirection: 'row', gap: resize(10)}}>
-					<CustomTextBold style={{...general.fontSize12}}>
-						{session?.active ? strings.active : strings.inactive}
+					<CustomTextBold style={{...general.fontSize12, textAlign: 'center'}}>
+						{session?.active ? strings.active : strings.inactive}{ts ? `\n(${formatDate(ts*1000)} ${formatTime(ts*1000)})` : ""}
 					</CustomTextBold>
-					<AntDesign name={session?.active ? "like1" : "dislike1"} size={resize(30)} color={black} style={{alignSelf: 'flex-start'}}/>
+					<AntDesign name={session?.active ? "like1" : "dislike1"} size={resize(30)} color={black} style={{alignSelf: ts ? 'center' :  'flex-start', paddingBottom: ts ? resize(5) : 0 }}/>
 				</View>
 				: null
 			}
