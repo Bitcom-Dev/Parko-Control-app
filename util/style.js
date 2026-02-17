@@ -1,4 +1,4 @@
-import { StyleSheet, Platform, StatusBar, Dimensions } from "react-native";
+import { StyleSheet, Platform, Dimensions } from "react-native";
 import {
   black,
   purple,
@@ -24,7 +24,7 @@ export const isPortrait = (dimensions) => {
 export const general = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === "android" ? 24 : 0,
     backgroundColor: lightOrange,
   },
   fontSize4: {

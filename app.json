@@ -21,7 +21,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bitcom.parkocontrol.bordeac03",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,6 +53,13 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location at all times",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location when the app is in use"
         }
       ]
     ]

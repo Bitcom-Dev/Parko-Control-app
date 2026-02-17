@@ -11,7 +11,7 @@ export default function Root() {
                 headerTitleAlign: 'center',
                 presentation: 'modal',
                 statusBarColor: purple,
-                statusBarStyle: 'light',
+                statusBarStyle: 'dark',
                 statusBarAnimation: 'fade',
                 headerTintColor: white,
                 headerStyle: {

@@ -1,14 +1,20 @@
 import { Slot, Stack } from 'expo-router';
-import { SessionProvider, useSession } from '../context/userContext';
-import { useEffect, useState } from 'react';
+import { SessionProvider, useSession, useAuth } from '../context/userContext';
+import { useEffect, useState, useRef } from 'react';
+import { AppState, Alert } from 'react-native';
 import SplashScreen from '../screens/SplashScreen';
 import { useFonts } from 'expo-font';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import { black, gray, purple, white } from '../util/colors';
 import { useMessage } from '../util/messages';
 import { removeValue, retrieveValue, saveValue } from '../util/storage';
+import * as Location from 'expo-location';
+import { authInstance } from '../util/instances';
 
 export default function Root() {
+	const strings = useMessage();
+	const auth = useAuth();
+
 	let [fontsLoaded] = useFonts({
 		Poppins_400Regular,
 		Poppins_500Medium,
@@ -22,6 +28,10 @@ export default function Root() {
     const [uuid, setUUID] = useState(null);
     const [user, setUser] = useState(null);
 	const [appIsReady, setAppIsReady] = useState(false);
+	const [location, setLocation] = useState(null);
+	const [locationPermission, setLocationPermission] = useState(null);
+	const [appState, setAppState] = useState(AppState.currentState);
+	const lastSentLocationRef = useRef(null);
 
 	const userConfig = {
         isLoggedIn,
@@ -36,16 +46,68 @@ export default function Root() {
         setUser,
         language,
         setLanguage,
+		location,
+		setLocation,
+		locationPermission,
+		setLocationPermission,
         signOut: () => {
             setUser(undefined);
         },
 		signIn: (data) => {
-			setUser({username: data.username, fullName: data.fullName});
+			setUser({username: data.username, fullName: data.fullName, modules: data.modules});
 			setAccessToken(data.accessToken);
 			setRefreshToken(data.refreshToken);
 			setUUID(data.uuid);
 		}
     };
+
+	const getLocationPermission = async () => {
+		try {
+			
+			const { status } = await Location.requestForegroundPermissionsAsync();
+			if (status !== 'granted') {
+				setLocationPermission(false);
+				setLocation(undefined);
+				Alert.alert(strings.LocationScreen.error, strings.LocationScreen.permissionDenied);
+			}
+			if (status === 'granted') {
+				setLocationPermission(true);
+			}
+		} catch (error) {
+			setLocationPermission(false);
+			setLocation(undefined);
+			Alert.alert(strings.LocationScreen.error, strings.LocationScreen.locationError);
+		}
+	};
+
+	const getMyLocation = async () => {
+		try {
+			const location = await Location.getCurrentPositionAsync({accuracy: Location.Accuracy.Highest});
+			return {
+				latitude: location.coords.latitude,
+				longitude: location.coords.longitude
+			};
+		} catch (error) {
+			console.error('Error getting location:', error);
+			return undefined;
+		}
+	};
+
+	const getDistanceInMeters = (loc1, loc2) => {
+		// Haversine formula to calculate distance between two GPS coordinates
+		const R = 6371000; // Earth radius in meters
+		const lat1 = (loc1.latitude * Math.PI) / 180;
+		const lat2 = (loc2.latitude * Math.PI) / 180;
+		const deltaLat = ((loc2.latitude - loc1.latitude) * Math.PI) / 180;
+		const deltaLon = ((loc2.longitude - loc1.longitude) * Math.PI) / 180;
+		
+		const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+				  Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+		
+		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		
+		return R * c; // Distance in meters
+	}
 
 	useEffect(() => {
 		if (uuid === null) {
@@ -111,6 +173,77 @@ export default function Root() {
 		return;
 	setAppIsReady(true);
 	}, [fontsLoaded,user]);
+
+	useEffect(() => {
+		const subscription = AppState.addEventListener('change', nextAppState => {
+			setAppState(nextAppState);
+		});
+
+		return () => {
+			subscription.remove();
+		};
+	}, []);
+
+	useEffect(() => {
+		if (appIsReady) {
+			getLocationPermission();
+		}
+	}, [appIsReady]);
+
+	useEffect(() => {
+		if (appState !== 'active' || !locationPermission) {
+			return;
+		}
+		
+		const fetchLocation = async () => {
+			try {
+				const loc = await getMyLocation();
+				setLocation(loc);
+			} catch (error) {
+				console.error('Error fetching location:', error);
+				setLocation(undefined);
+			}
+		};
+
+		fetchLocation();
+		
+		const intervalId = setInterval(fetchLocation, 5000);
+		
+		return () => {
+			clearInterval(intervalId);
+		};
+	}, [appState, locationPermission]);
+
+	useEffect(() => {
+		if (!location || !user || !accessToken) return;
+		
+		// Calculate distance from last sent location
+		const hasMoved = () => {
+			if (!lastSentLocationRef.current) return true;
+			
+			const distance = getDistanceInMeters(
+				lastSentLocationRef.current,
+				location
+			);
+			return distance > 5; // Only send if moved > 5 meters
+		};
+		
+		if (!hasMoved()) return;
+		
+		const sendLocation = async () => {
+				try {
+					await authInstance(userConfig).post('/location', {
+						latitude: location.latitude,
+						longitude: location.longitude
+					});
+					lastSentLocationRef.current = location;
+				} catch (error) {
+					console.error('Failed to send location:', error);
+				}
+			};
+			
+			sendLocation();
+	}, [location, user, accessToken, auth]);
 
 
 	if (!appIsReady) return <SplashScreen />;

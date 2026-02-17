@@ -7,7 +7,6 @@ import Logo from '../util/Logo';
 import { CustomTextBold, CustomTextInputFloating, CustomTextMedium } from '../util/CustomText';
 import { general, resize } from '../util/style';
 import { useMessage } from '../util/messages';
-import { StatusBar } from 'expo-status-bar';
 import { authInstance } from '../util/instances';
 import LogoCheck from '../assets/LogoCheck';
 

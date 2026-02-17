@@ -3,7 +3,8 @@ import { useMemo, useContext } from "react";
 import { userContext } from "../context/userContext";
 
 export const useMessage = () => {
-  const { language } = useContext(userContext);
-  const msg = useMemo(() => ms[language], [language]);
+  const ctx = useContext(userContext) || {};
+  const language = ctx.language || "en";
+  const msg = useMemo(() => ms[language] || ms["en"], [language]);
   return msg;
 };

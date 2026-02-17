@@ -65,6 +65,11 @@
       "months": "Months",
       "years": "Years",
       "overtime": "Overtime"
+    },
+    "LocationScreen": {
+      "error": "Error",
+      "permissionDenied": "Location permission is required for this app to function properly. Please enable it in your device settings.",
+      "locationError": "Failed to get your current location. Please check your GPS settings."
     }
   },
   "ro": {
@@ -133,6 +138,11 @@
       "months": "Luni",
       "years": "Ani",
       "overtime": "Depasire"
+    },
+    "LocationScreen": {
+      "error": "Eroare",
+      "permissionDenied": "Permisiunea de locatie este necesara pentru ca aplicatia sa functioneze corespunzator. Va rugam activati-o in setarile dispozitivului.",
+      "locationError": "Nu s-a putut obtine locatia curenta. Va rugam verificati setarile GPS."
     }
   }
 }

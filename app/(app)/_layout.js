@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useSession } from '../../context/userContext';
 import { black, purple, white } from '../../util/colors';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 export default function Root() {
 	const { isLoggedIn } = useSession();
@@ -30,7 +31,8 @@ export default function Root() {
 			<Stack.Screen 
 				name='settings'
 				options={{
-					headerShown: false,
+					headerShown: Platform.OS === 'android' ? false : true,
+					headerBackTitleVisible: false,
 					animation: 'slide_from_right',
 					gestureEnabled: true,
 					animationDuration: 50,
@@ -40,7 +42,8 @@ export default function Root() {
 			<Stack.Screen 
 				name='camera'
 				options={{
-					headerShown: false,
+					headerShown: Platform.OS === 'android' ? false : true,
+					headerBackTitleVisible: false,
 					animation: 'slide_from_left',
 					gestureEnabled: true,
 					animationDuration: 50,
