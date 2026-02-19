@@ -130,9 +130,9 @@ const PlateCard = ({ item, strings }) => {
 		if (!distanceKm && distanceKm !== 0) return '—';
 		if (distanceKm < 1) {
 			const meters = Math.round(distanceKm * 1000);
-			return `${meters} m`;
+			return `${meters} ${strings?.unitM}`;
 		}
-		return `${parseFloat(distanceKm).toFixed(2)} km`;
+		return `${parseFloat(distanceKm).toFixed(2)} ${strings?.unitKm}`;
 	};
 
 	return (
@@ -235,7 +235,7 @@ const PlateCard = ({ item, strings }) => {
 					</View>
 					<View style={{ flex: 1 }}>
 						<CustomTextRegular style={{ ...general.fontSize9, color: gray }}>
-							{strings?.detectedAt || 'Detected at'}
+								{strings?.detectedAt}
 						</CustomTextRegular>
 						<CustomTextMedium style={{ ...general.fontSize10, color: black, marginTop: resize(2) }}>
 							{formatTime(item.ts)}
@@ -261,7 +261,7 @@ const PlateCard = ({ item, strings }) => {
 						</View>
 						<View style={{ flex: 1 }}>
 							<CustomTextRegular style={{ ...general.fontSize9, color: gray }}>
-								{strings?.distance || 'Distance'}
+								{strings?.distance}
 							</CustomTextRegular>
 							<CustomTextMedium style={{ ...general.fontSize10, color: black, marginTop: resize(2) }}>
 								{formatDistance(item.distance)}
@@ -282,7 +282,7 @@ const PlateCard = ({ item, strings }) => {
 						}}
 					>
 						<CustomTextRegular style={{ ...general.fontSize9, color: gray, marginBottom: resize(8) }}>
-							{strings?.openInMaps || 'Open in Maps'}
+							{strings?.openInMaps}
 						</CustomTextRegular>
 						<View style={{ flexDirection: 'row', gap: resize(8) }}>
 							<TouchableOpacity
@@ -305,7 +305,7 @@ const PlateCard = ({ item, strings }) => {
 							>
 								<MaterialIcons name="map" size={resize(16)} color={white} />
 								<CustomTextMedium style={{ ...general.fontSize10, color: white }}>
-									Google
+									{strings?.googleMaps}
 								</CustomTextMedium>
 							</TouchableOpacity>
 
@@ -329,7 +329,7 @@ const PlateCard = ({ item, strings }) => {
 							>
 								<FontAwesome5 name="waze" size={resize(14)} color={white} />
 								<CustomTextMedium style={{ ...general.fontSize10, color: white }}>
-									Waze
+									{strings?.waze}
 								</CustomTextMedium>
 							</TouchableOpacity>
 						</View>
@@ -346,7 +346,7 @@ const PlateCard = ({ item, strings }) => {
 					}}
 				>
 					<CustomTextRegular style={{ ...general.fontSize9, color: gray, marginBottom: resize(8) }}>
-						{strings?.actions || 'Actions'}
+						{strings?.actions}
 					</CustomTextRegular>
 					<View style={{ flexDirection: 'column', gap: resize(8) }}>
 						<TouchableOpacity
@@ -366,7 +366,7 @@ const PlateCard = ({ item, strings }) => {
 						>
 							<MaterialIcons name="note-add" size={resize(16)} color={purple} />
 							<CustomTextMedium style={{ ...general.fontSize9, color: purple }}>
-								{strings?.inspectionNote || 'Nota de constatare'}
+								{strings?.inspectionNote}
 							</CustomTextMedium>
 						</TouchableOpacity>
 
@@ -387,7 +387,7 @@ const PlateCard = ({ item, strings }) => {
 						>
 							<Feather name="log-out" size={resize(15)} color={orange} />
 							<CustomTextMedium style={{ ...general.fontSize9, color: orange }}>
-								{strings?.vehicleLeft || 'Vehicul plecat'}
+								{strings?.vehicleLeft}
 							</CustomTextMedium>
 						</TouchableOpacity>
 					</View>
@@ -416,7 +416,7 @@ const PlateCard = ({ item, strings }) => {
 							<View style={fullscreenModalStyles.loadingContainer}>
 								<ActivityIndicator size="large" color={white} />
 								<CustomTextRegular style={fullscreenModalStyles.loadingText}>
-									{strings?.loading || 'Loading...'}
+									{strings?.loading}
 								</CustomTextRegular>
 							</View>
 						</View>
@@ -447,7 +447,7 @@ const PlateCard = ({ item, strings }) => {
 					FooterComponent={() => (
 						<View style={fullscreenModalStyles.hintContainer}>
 							<CustomTextRegular style={fullscreenModalStyles.hintText}>
-								{strings?.pinchToZoom || 'Pinch to zoom • Drag to move'}
+								{strings?.pinchToZoom}
 							</CustomTextRegular>
 						</View>
 					)}
@@ -529,18 +529,18 @@ const LPRScreen = () => {
 					setPage(pageNum);
 
 					if (newPlates.length === 0) {
-						setErrorMessage(strings?.noData || 'No plates found');
+						setErrorMessage(strings?.noData);
 					}
 				})
 				.catch((error) => {
 					if (error.response?.status === 404) {
-						setErrorMessage(strings?.notFound || 'Endpoint not found');
+						setErrorMessage(strings?.notFound);
 					} else if (error.response?.status === 403) {
-						setErrorMessage(strings?.forbidden || 'Access denied');
+						setErrorMessage(strings?.forbidden);
 					} else if (error.message === 'Network Error') {
-						setErrorMessage(strings?.networkError || 'Network error');
+						setErrorMessage(strings?.networkError);
 					} else {
-						setErrorMessage(strings?.loadError || 'Failed to load plates');
+						setErrorMessage(strings?.loadError);
 					}
 					setPlates([]);
 					setTotal(0);
@@ -633,8 +633,8 @@ const LPRScreen = () => {
 						}}
 					>
 						{value
-							? options.find((opt) => opt.value === value)?.label || 'Select...'
-							: 'All'}
+							? (options.find((opt) => opt.value === value)?.label ?? strings?.select)
+							: strings?.all}
 					</CustomTextRegular>
 					<MaterialIcons
 						name={showDropdown ? 'expand-less' : 'expand-more'}
@@ -673,7 +673,7 @@ const LPRScreen = () => {
 							}}
 						>
 							<CustomTextRegular style={{ ...general.fontSize10, color: black }}>
-								All
+								{strings?.all}
 							</CustomTextRegular>
 						</TouchableOpacity>
 
@@ -726,8 +726,9 @@ const LPRScreen = () => {
 			}}
 			disabled={page <= 1 || loading}
 			style={{
-				flexDirection: 'row',
-				alignItems: 'center',
+					flexDirection: 'row',
+					alignItems: 'center',
+					justifyContent: 'center',
 				paddingHorizontal: resize(12),
 				paddingVertical: resize(8),
 				borderRadius: resize(8),
@@ -736,20 +737,15 @@ const LPRScreen = () => {
 				borderColor: page <= 1 || loading ? lightGray : purple,
 			}}
 		>
-			<MaterialIcons name="chevron-left" size={resize(18)} color={page <= 1 || loading ? gray : purple} />
-			<CustomTextMedium
-				style={{ ...general.fontSize9, color: page <= 1 || loading ? gray : purple, marginLeft: resize(2) }}
-			>
-				Prev
-			</CustomTextMedium>
+				<MaterialIcons name="chevron-left" size={resize(24)} color={page <= 1 || loading ? gray : purple} />
 			</TouchableOpacity>
 
 			<View style={{ alignItems: 'center' }}>
 				<CustomTextBold style={{ ...general.fontSize10, color: black }}>
-					{strings?.page || 'Page'} {page} / {totalPages}
+					{strings?.page} {page} / {totalPages}
 				</CustomTextBold>
 				<CustomTextRegular style={{ ...general.fontSize8, color: gray }}>
-					{total} {strings?.totalRecords || 'records'}
+					{total} {strings?.totalRecords}
 				</CustomTextRegular>
 			</View>
 
@@ -763,6 +759,7 @@ const LPRScreen = () => {
 				style={{
 					flexDirection: 'row',
 					alignItems: 'center',
+					justifyContent: 'center',
 					paddingHorizontal: resize(12),
 					paddingVertical: resize(8),
 					borderRadius: resize(8),
@@ -771,12 +768,7 @@ const LPRScreen = () => {
 					borderColor: page >= totalPages || loading ? lightGray : purple,
 				}}
 			>
-				<CustomTextMedium
-					style={{ ...general.fontSize9, color: page >= totalPages || loading ? gray : purple, marginRight: resize(2) }}
-				>
-					Next
-				</CustomTextMedium>
-				<MaterialIcons name="chevron-right" size={resize(18)} color={page >= totalPages || loading ? gray : purple} />
+				<MaterialIcons name="chevron-right" size={resize(24)} color={page >= totalPages || loading ? gray : purple} />
 			</TouchableOpacity>
 		</View>
 	);
@@ -802,7 +794,7 @@ const LPRScreen = () => {
 						}}
 					>
 						<CustomTextBold style={{ ...general.fontSize14, color: black }}>
-							{strings?.filters || 'Filters'}
+							{strings?.filters}
 						</CustomTextBold>
 						<TouchableOpacity onPress={() => setShowFilters(false)}>
 							<AntDesign name="close" size={resize(22)} color={black} />
@@ -816,7 +808,7 @@ const LPRScreen = () => {
 					>
 						<View style={{ marginBottom: resize(14) }}>
 							<CustomTextMedium style={{ ...general.fontSize10, color: black, marginBottom: resize(5) }}>
-								{strings?.search || 'Search Plate'}
+								{strings?.search}
 							</CustomTextMedium>
 							<TextInput
 								style={{
@@ -829,7 +821,7 @@ const LPRScreen = () => {
 									backgroundColor: white,
 									...general.fontSize10,
 								}}
-								placeholder="ABC123"
+								placeholder={strings?.platePlaceholder}
 								placeholderTextColor={gray}
 								value={search}
 								onChangeText={(text) => setSearch(text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
@@ -838,34 +830,34 @@ const LPRScreen = () => {
 							/>
 						</View>
 						<SelectInput
-							label={strings?.radius || 'Radius (km)'}
+							label={strings?.radius}
 							value={radius}
 							onChange={setRadius}
 							options={[
-								{ value: '1', label: '1 km' },
-								{ value: '2', label: '2 km' },
-								{ value: '3', label: '3 km' },
-								{ value: '4', label: '4 km' },
-								{ value: '5', label: '5 km' },
-								{ value: '10', label: '10 km' },
+								{ value: '1', label: `1 ${strings?.unitKm}` },
+								{ value: '2', label: `2 ${strings?.unitKm}` },
+								{ value: '3', label: `3 ${strings?.unitKm}` },
+								{ value: '4', label: `4 ${strings?.unitKm}` },
+								{ value: '5', label: `5 ${strings?.unitKm}` },
+								{ value: '10', label: `10 ${strings?.unitKm}` },
 							]}
 						/>
 						<SelectInput
-							label={strings?.timeDelta || 'Time Delta (minutes)'}
+							label={strings?.timeDelta}
 							value={tsdelta}
 							onChange={setTsdelta}
 							options={[
-								{ value: '5', label: '5 min' },
-								{ value: '10', label: '10 min' },
-								{ value: '30', label: '30 min' },
-								{ value: '60', label: '60 min' },
+								{ value: '5', label: `5 ${strings?.unitMin}` },
+								{ value: '10', label: `10 ${strings?.unitMin}` },
+								{ value: '30', label: `30 ${strings?.unitMin}` },
+								{ value: '60', label: `60 ${strings?.unitMin}` },
 							]}
 						/>
 
 						{/* Read-only GPS fields */}
 						{[
-							{ label: strings?.latitude || 'Latitude', val: latitude },
-							{ label: strings?.longitude || 'Longitude', val: longitude },
+							{ label: strings?.latitude, val: latitude },
+							{ label: strings?.longitude, val: longitude },
 						].map(({ label, val }) => (
 							<View key={label} style={{ marginBottom: resize(14) }}>
 								<CustomTextMedium
@@ -916,7 +908,7 @@ const LPRScreen = () => {
 							onPress={handleResetFilters}
 						>
 							<CustomTextMedium style={{ ...general.fontSize11, color: purple }}>
-								{strings?.reset || 'Reset'}
+								{strings?.reset}
 							</CustomTextMedium>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -931,7 +923,7 @@ const LPRScreen = () => {
 							onPress={handleApplyFilters}
 						>
 							<CustomTextMedium style={{ ...general.fontSize11, color: white }}>
-								{strings?.apply || 'Apply'}
+								{strings?.apply}
 							</CustomTextMedium>
 						</TouchableOpacity>
 					</View>
@@ -966,7 +958,7 @@ const LPRScreen = () => {
 				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 					<MaterialIcons name="image-search" size={resize(80)} color={gray} />
 					<CustomTextMedium style={{ marginTop: resize(16), ...general.fontSize12, color: gray }}>
-						{strings?.noData || 'No plates found'}
+						{strings?.noData}
 					</CustomTextMedium>
 				</View>
 			) : (
