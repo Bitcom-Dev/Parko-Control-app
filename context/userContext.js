@@ -23,10 +23,12 @@ export const useAuth = () => {
 	};
 }
 
-export const SessionProvider = ({children, value}) => {
+const SessionProvider = ({children, value}) => {
     return (
         <userContext.Provider value={value}>
             {children}
         </userContext.Provider>
     );
 }
+
+export default SessionProvider;

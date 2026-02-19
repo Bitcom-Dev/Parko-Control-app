@@ -4,7 +4,7 @@ import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView, ActivityIndic
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { useAuth, useSession } from '../../../context/userContext';
 import { useMessage } from '../../../util/messages';
-import { AntDesign } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { black, gray, green, lightOrange, purple, red, white } from '../../../util/colors';
 import { resize, standardMin, general } from '../../../util/style';
 import { FlashList } from "@shopify/flash-list";
@@ -38,7 +38,7 @@ const History = () => {
                         <CustomTextMedium style={{...general.fontSize14}}>
                             {props.vehicle}
                         </CustomTextMedium>
-                        <AntDesign name={props.active ? "checkcircle" : "closecircle"} size={resize(35)} color={props.active ? green : red} />
+                        <MaterialCommunityIcons name={props.active ? "check-circle" : "close-circle"} size={resize(35)} color={props.active ? green : red} />
                     </View>
                     <CustomTextRegular style={{...general.fontSize10, alignSelf: 'flex-end'}}>
                         {timestampToString(props.ts * 1000)}

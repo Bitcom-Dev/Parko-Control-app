@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useAuth, useSession } from '../context/userContext';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { black, gray, orange, purple, white } from '../util/colors';
@@ -6,11 +6,11 @@ import {  Stack, router } from 'expo-router';
 import Logo from '../util/Logo';
 import { CustomTextBold, CustomTextInputFloating, CustomTextMedium } from '../util/CustomText';
 import { general, resize } from '../util/style';
-import { useMessage } from '../util/messages';
 import { StatusBar } from 'expo-status-bar';
 import { authInstance } from '../util/instances';
 import LogoCheck from '../assets/LogoCheck';
 import useMessage from '../util/messages';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SignIn = () => {
 	const { signIn } = useSession();

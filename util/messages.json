@@ -70,6 +70,51 @@
       "error": "Error",
       "permissionDenied": "Location permission is required for this app to function properly. Please enable it in your device settings.",
       "locationError": "Failed to get your current location. Please check your GPS settings."
+    },
+    "MenuModal": {
+      "selectModule": "Select Module",
+      "control": "Control",
+      "controlVideo": "Control Video",
+      "lpr": "ANPR",
+      "notaConstatare": "Nota de Constatare"
+    },
+    "LPRScreen": {
+      "title": "ANPR Module",
+      "desc": "Automatic Number Plate Recognition module - Coming soon",
+      "error": "Error",
+      "loadError": "Failed to load plates",
+      "notFound": "LPR endpoint not found - Please check server configuration",
+      "forbidden": "Access denied - LPR module not enabled",
+      "networkError": "Network connection error",
+      "fine": "Fine",
+      "noFine": "No Fine",
+      "filters": "Filters",
+      "search": "Search Plate",
+      "radius": "Radius (km)",
+      "timeDelta": "Time Delta (minutes)",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "mode": "Mode",
+      "apply": "Apply",
+      "reset": "Reset",
+      "noData": "No plates found",
+      "timestamp": "Timestamp",
+      "camera": "Camera",
+      "coordinates": "Coordinates",
+      "estimatedCoords": "Est. Coords",
+      "speed": "Speed",
+      "course": "Course",
+      "distance": "Distance",
+      "status": "Status",
+      "fineStatus": "Fine Status",
+      "confidence": "Confidence",
+      "page": "Page",
+      "totalRecords": "records",
+      "noImage": "No image"
+    },
+    "NotaConstatareScreen": {
+      "title": "Nota de Constatare",
+      "desc": "Nota de Constatare module - Coming soon"
     }
   },
   "ro": {
@@ -143,6 +188,51 @@
       "error": "Eroare",
       "permissionDenied": "Permisiunea de locatie este necesara pentru ca aplicatia sa functioneze corespunzator. Va rugam activati-o in setarile dispozitivului.",
       "locationError": "Nu s-a putut obtine locatia curenta. Va rugam verificati setarile GPS."
+    },
+    "MenuModal": {
+      "selectModule": "Selecteaza Modul",
+      "control": "Control",
+      "controlVideo": "Control Video",
+      "lpr": "ANPR",
+      "notaConstatare": "Nota de Constatare"
+    },
+    "LPRScreen": {
+      "title": "Modul ANPR",
+      "desc": "Modul de recunoastere automata a numarului de inmatriculare - In curand",
+      "error": "Eroare",
+      "loadError": "Eroare la incarcare placi",
+      "notFound": "Endpoint LPR nu a fost gasit - Verifica configuratia serverului",
+      "forbidden": "Acces refuzat - Modulul LPR nu este activat",
+      "networkError": "Eroare de conexiune retea",
+      "fine": "Amenda",
+      "noFine": "Fara Amenda",
+      "filters": "Filtre",
+      "search": "Cauta Placa",
+      "radius": "Raza (km)",
+      "timeDelta": "Delta de Timp (minute)",
+      "latitude": "Latitudine",
+      "longitude": "Longitudine",
+      "mode": "Mod",
+      "apply": "Aplica",
+      "reset": "Resetare",
+      "noData": "Nu s-au gasit placi",
+      "timestamp": "Marca de timp",
+      "camera": "Camera",
+      "coordinates": "Coordonate",
+      "estimatedCoords": "Coord. Est.",
+      "speed": "Viteza",
+      "course": "Directie",
+      "distance": "Distanta",
+      "status": "Status",
+      "fineStatus": "Status Amenda",
+      "confidence": "Confidenta",
+      "page": "Pagina",
+      "totalRecords": "inregistrari",
+      "noImage": "Fara imagine"
+    },
+    "NotaConstatareScreen": {
+      "title": "Nota de Constatare",
+      "desc": "Modul Nota de Constatare - In curand"
     }
   }
 }

@@ -3,7 +3,7 @@ import { purple, white } from '../../../util/colors';
 import useMessage from '../../../util/messages';
 
 export default function Root() {
-    const { CameraScreen: strings } = useMessage();
+    const { LPRScreen: strings } = useMessage();
     return (
         <Stack 
 		    screenOptions={{

@@ -1,5 +1,5 @@
 import { Slot, Stack } from 'expo-router';
-import { SessionProvider, useSession, useAuth } from '../context/userContext';
+import SessionProvider from '../context/userContext';
 import { useEffect, useState, useRef } from 'react';
 import { AppState, Alert } from 'react-native';
 import SplashScreen from '../screens/SplashScreen';
@@ -10,6 +10,7 @@ import { useMessage } from '../util/messages';
 import { removeValue, retrieveValue, saveValue } from '../util/storage';
 import * as Location from 'expo-location';
 import { authInstance } from '../util/instances';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const Layout = () => {
 	let [fontsLoaded] = useFonts({
@@ -240,18 +241,19 @@ const Layout = () => {
 			};
 			
 			sendLocation();
-	}, [location, user, accessToken, auth]);
-
+	}, [location, user, accessToken]);
 
 	if (!appIsReady) return <SplashScreen />;
 
     return (
+		<GestureHandlerRootView style={{ flex: 1 }}>
         <SessionProvider value={userConfig}>
             <Stack
 				screenOptions={{
 					headerShown: false
 				}}
 			>
+				<Stack.Screen name='(app)' />
 				<Stack.Screen
 					name='signIn'
 					options={{
@@ -267,6 +269,7 @@ const Layout = () => {
 				/>
 			</Stack>
         </SessionProvider>
+		</GestureHandlerRootView>
 	);
 };
 

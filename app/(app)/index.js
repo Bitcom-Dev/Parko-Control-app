@@ -1,14 +1,15 @@
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { Ionicons, MaterialIcons, AntDesign, FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome6, Fontisto } from '@expo/vector-icons';
 import { resize, general } from "../../util/style";
 import { black, gray, green, orange, purple, red, white } from "../../util/colors";
 import { CustomTextBold, CustomTextInputFloating, CustomTextMedium, CustomTextRegular } from "../../util/CustomText";
 import { useCallback, useEffect, useState } from "react";
 import { useMessage } from "../../util/messages";
 import { controlInstance } from "../../util/instances";
-import { useAuth } from "../../context/userContext";
+import { useAuth, useSession } from "../../context/userContext";
 import { FlashList } from "@shopify/flash-list";
+import ModuleMenu from "../../util/ModuleMenu";
 
 export default function Index() {
     const { HomeScreen: strings } = useMessage();
@@ -20,6 +21,8 @@ export default function Index() {
     const [session, setSession] = useState(JSON.parse(details));
 	const [history, setHistory] = useState([]);
 	const auth = useAuth();
+	const userSession = useSession();
+	const [menuVisible, setMenuVisible] = useState(false);
 
 
 	const loadData = () => {
@@ -174,13 +177,20 @@ export default function Index() {
 						{timeAgo(props.ts*1000)}
 					</CustomTextMedium>
 				</View>
-				<AntDesign name={props.active ? "checkcircle" : "closecircle"} size={resize(30)} color={props.active ? green : orange} style={{alignSelf: 'flex-start'}}/>
+				<MaterialCommunityIcons name={props.active ? "check-circle" : "close-circle"} size={resize(30)} color={props.active ? green : orange} style={{alignSelf: 'flex-start'}}/>
 			</TouchableOpacity>
 		);
 	}
 	
     return (
         <View style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', backgroundColor: white }}>
+			<ModuleMenu 
+				visible={menuVisible}
+				modules={userSession?.user?.modules || []}
+				user={userSession?.user}
+				onClose={() => setMenuVisible(false)}
+				onModuleSelect={(route) => router.push(route)}
+			/>
             <Stack.Screen 
             options={{
                 headerRight: () => (
@@ -191,11 +201,9 @@ export default function Index() {
                     </Link>
                 ),
 				headerLeft: () => (
-					<Link href="/camera" asChild>
-                        <TouchableOpacity style={{borderRadius: resize(20), overflow: 'hidden'}}>
-                            <Ionicons name="camera" size={resize(35)} color={purple} />
-                        </TouchableOpacity>
-                    </Link>
+					<TouchableOpacity style={{borderRadius: resize(20), overflow: 'hidden'}} onPress={() => setMenuVisible(true)}>
+                            <MaterialIcons name="menu" size={resize(35)} color={purple} />
+                    </TouchableOpacity>
 				),
             }}/>
             <CustomTextInputFloating
@@ -230,7 +238,7 @@ export default function Index() {
 					<CustomTextBold style={{...general.fontSize12, textAlign: 'center'}}>
 						{session?.active ? strings.active : strings.inactive}{ts ? `\n(${formatDate(ts*1000)} ${formatTime(ts*1000)})` : ""}
 					</CustomTextBold>
-					<AntDesign name={session?.active ? "like1" : "dislike1"} size={resize(30)} color={black} style={{alignSelf: ts ? 'center' :  'flex-start', paddingBottom: ts ? resize(5) : 0 }}/>
+					<Fontisto name={session?.active ? "like" : "dislike"} size={resize(30)} color={black} style={{alignSelf: ts ? 'center' :  'flex-start', paddingBottom: ts ? resize(5) : 0 }}/>
 				</View>
 				: null
 			}

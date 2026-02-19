@@ -1,8 +1,8 @@
-import {View, StyleSheet, Text, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {View, StyleSheet, Text, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
 import { CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { resize, general } from '../../../util/style';
 import { black, gray, green, orange, purple, white } from '../../../util/colors';
-import { FontAwesome6, MaterialIcons, Feather, AntDesign } from '@expo/vector-icons';
+import { FontAwesome6, MaterialIcons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useMessage } from '../../../util/messages';
 import { useAuth, useSession } from '../../../context/userContext';
@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { controlInstance } from '../../../util/instances';
 import useWebsocket from '../../../util/useWebsocket';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Index = () => {
     const { CameraScreen: strings } = useMessage();
@@ -137,7 +138,7 @@ const Index = () => {
 						{timeAgo(props.ts*1000)}
 					</CustomTextMedium>
 				</View>
-				<AntDesign name={props.active ? "checkcircle" : "closecircle"} size={resize(30)} color={props.active ? green : orange} style={{alignSelf: 'flex-start'}}/>
+				<MaterialCommunityIcons name={props.active ? "check-circle" : "close-circle"} size={resize(30)} color={props.active ? green : orange} style={{alignSelf: 'flex-start'}}/>
 			</TouchableOpacity>
 		);
 	}
@@ -193,6 +194,6 @@ const Index = () => {
         </SafeAreaView>
     );
 }
-
+export default Index;
 const styles = StyleSheet.create({})
 

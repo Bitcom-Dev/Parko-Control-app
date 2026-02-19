@@ -1,4 +1,4 @@
-import {View, StyleSheet, Text, SafeAreaView, ScrollView, TouchableOpacity} from 'react-native';
+import {View, StyleSheet, Text, ScrollView, TouchableOpacity} from 'react-native';
 import { CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { resize, general } from '../../../util/style';
 import { gray, purple } from '../../../util/colors';
@@ -7,7 +7,7 @@ import { Link } from 'expo-router';
 import { useMessage } from '../../../util/messages';
 import { useSession } from '../../../context/userContext';
 
-const Index = () => {
+const IndexSettings = () => {
     const { SettingsScreen: strings } = useMessage();
     const { signOut, user } = useSession();
     return (
@@ -51,5 +51,5 @@ const Index = () => {
     );
 };
 
-export default Index;
+export default IndexSettings;
 
