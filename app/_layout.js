@@ -11,10 +11,7 @@ import { removeValue, retrieveValue, saveValue } from '../util/storage';
 import * as Location from 'expo-location';
 import { authInstance } from '../util/instances';
 
-export default function Root() {
-	const strings = useMessage();
-	const auth = useAuth();
-
+const Layout = () => {
 	let [fontsLoaded] = useFonts({
 		Poppins_400Regular,
 		Poppins_500Medium,
@@ -271,4 +268,6 @@ export default function Root() {
 			</Stack>
         </SessionProvider>
 	);
-}
+};
+
+export default Layout;

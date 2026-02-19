@@ -18,7 +18,7 @@ const Checkbox = ({style, value, onPress}) => {
 }
 
 
-export default Language = () => {
+const Language = () => {
     const {language, setLanguage} = useSession();
     const [english, setEnglish] = useState(language === 'en' ? true : false);
     const [romanian, setRomanian] = useState(language === 'ro' ? true : false);
@@ -52,6 +52,8 @@ export default Language = () => {
         </ScrollView>
     );
 }
+
+export default Language;
 
 const styles = StyleSheet.create({
     yellow: {

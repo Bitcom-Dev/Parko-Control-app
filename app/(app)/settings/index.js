@@ -7,7 +7,7 @@ import { Link } from 'expo-router';
 import { useMessage } from '../../../util/messages';
 import { useSession } from '../../../context/userContext';
 
-export default Index = () => {
+const Index = () => {
     const { SettingsScreen: strings } = useMessage();
     const { signOut, user } = useSession();
     return (
@@ -49,7 +49,7 @@ export default Index = () => {
             </TouchableOpacity>
         </ScrollView>
     );
-}
+};
 
-const styles = StyleSheet.create({})
+export default Index;
 

@@ -12,7 +12,7 @@ import { FlashList } from '@shopify/flash-list';
 import { controlInstance } from '../../../util/instances';
 import useWebsocket from '../../../util/useWebsocket';
 
-export default Index = () => {
+const Index = () => {
     const { CameraScreen: strings } = useMessage();
     const [permission, requestPermission] = useCameraPermissions();
     const { user } = useSession();

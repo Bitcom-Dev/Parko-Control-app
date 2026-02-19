@@ -7,10 +7,12 @@ import Logo from '../util/Logo';
 import { CustomTextBold, CustomTextInputFloating, CustomTextMedium } from '../util/CustomText';
 import { general, resize } from '../util/style';
 import { useMessage } from '../util/messages';
+import { StatusBar } from 'expo-status-bar';
 import { authInstance } from '../util/instances';
 import LogoCheck from '../assets/LogoCheck';
+import useMessage from '../util/messages';
 
-export default function SignIn() {
+const SignIn = () => {
 	const { signIn } = useSession();
 	const [loading, setLoading] = useState(false);
 	const [username, setUsername] = useState("");
@@ -74,4 +76,6 @@ export default function SignIn() {
 			</TouchableOpacity>
 		</SafeAreaView>
 	);
-}
+};
+
+export default SignIn;

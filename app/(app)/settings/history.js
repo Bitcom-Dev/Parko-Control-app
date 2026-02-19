@@ -10,7 +10,7 @@ import { resize, standardMin, general } from '../../../util/style';
 import { FlashList } from "@shopify/flash-list";
 import { controlInstance } from '../../../util/instances';
 
-export default History = () => {
+const History = () => {
     const { HistoryScreen: strings } = useMessage();
     const [DATA, setDATA] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -147,3 +147,4 @@ const styles = StyleSheet.create({
     }
 })
 
+export default History;

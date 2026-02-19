@@ -3,7 +3,7 @@ import React from 'react'
 import Logo from '../assets/Logo'
 import { purple, white } from '../util/colors'
 
-export default SplashScreen = () => {
+const SplashScreen = () => {
   return (
     <View style={{flex: 1, justifyContent: 'center', alignItems:'center', backgroundColor: purple, paddingBottom: 60}}>
       <Logo style={{maxWidth: 500, flexBasis: 150}} />
@@ -11,3 +11,4 @@ export default SplashScreen = () => {
     </View>
   )
 }
+export default SplashScreen

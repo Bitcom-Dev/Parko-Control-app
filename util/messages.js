@@ -8,3 +8,4 @@ export const useMessage = () => {
   const msg = useMemo(() => ms[language] || ms["en"], [language]);
   return msg;
 };
+export default useMessage;
