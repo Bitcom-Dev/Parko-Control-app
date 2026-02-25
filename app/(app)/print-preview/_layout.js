@@ -1,9 +1,9 @@
 import { Stack } from 'expo-router';
 import { purple, white } from '../../../util/colors';
-import { useMessage } from '../../../util/messages';
+import useMessage from '../../../util/messages';
 
 export default function Root() {
-    const { SettingsScreen: strings } = useMessage();
+    const { PrintPreviewScreen: strings } = useMessage();
     return (
         <Stack 
 		    screenOptions={{
@@ -19,6 +19,7 @@ export default function Root() {
                 },
                 gestureEnabled: true,
             }}
+            
         />
 	);
 }

@@ -7,6 +7,7 @@
       "zone": "Zone",
       "paid": "Paid",
       "parkingLot": "Parking Lot",
+      "notaConstatare": "Inspection note",
       "noSession": "No active parking session!",
       "active": "Active Session",
       "inactive": "Inactive Session",
@@ -49,7 +50,8 @@
       "title": "Settings",
       "language": "Language",
       "logout": "Logout",
-      "history": "History"
+      "history": "History",
+      "printHistory": "Print History"
     },
     "CameraScreen": {
       "title": "Camera",
@@ -64,7 +66,8 @@
       "weeks": "Weeks",
       "months": "Months",
       "years": "Years",
-      "overtime": "Overtime"
+      "overtime": "Overtime",
+      "inspectionNote": "Inspection Note"
     },
     "LocationScreen": {
       "error": "Error",
@@ -131,7 +134,47 @@
     },
     "NotaConstatareScreen": {
       "title": "Nota de Constatare",
-      "desc": "Nota de Constatare module - Coming soon"
+      "desc": "Nota de Constatare module - Coming soon",
+      "selectViolationType": "Select Violation Type",
+      "violationCode": "Violation Code",
+      "photo": "Photo",
+      "photoHint": "Make sure the vehicle and the license plate are clearly visible in the frame.",
+      "continue": "Continue",
+      "locationPermissionRequired": "Location permission is required to continue.",
+      "addPhoto": "Add photo",
+      "takePhoto": "Take photo",
+      "changePhoto": "Change photo",
+      "removePhoto": "Remove photo",
+      "photoLoading": "Loading photo...",
+      "photoLoadError": "Failed to load photo",
+      "cameraPermissionRequired": "Camera permission required",
+      "requestPermission": "Request Permission",
+      "requirements": "Required Information",
+      "loading": "Loading...",
+      "loadError": "Failed to load data",
+      "noViolationCodes": "No violation codes available",
+      "selectFirst": "Please select a violation type first",
+      "noRequirements": "No additional requirements",
+      "select": "Select...",
+      "error": "Error",
+      "networkError": "Network connection error",
+      "true": "Yes",
+      "false": "No"
+    },
+    "PrintHistoryScreen": {
+      "main": "Print History",
+      "desc": "Here you can find the latest printed inspection notes!",
+      "noHistory": "No print history found."
+    },
+    "PrintPreviewScreen": {
+      "title": "Print preview",
+      "printedId": "Printed ID",
+      "loading": "Loading preview...",
+      "missingTemplate": "Missing template from server.",
+      "back": "Back",
+      "print": "Print",
+      "printNotImplemented": "Printing will be added next.",
+      "info": "Info"
     }
   },
   "ro": {
@@ -140,8 +183,9 @@
       "startTime": "Ora de inceput",
       "endTime": "Ora de sfarsit",
       "zone": "Zona",
-      "paid": "Platit",
-      "parkingLot": "Loc de parcare",
+      "paid": "Platita",
+      "parkingLot": "Parcare",
+      "notaConstatare": "Nota de constatare",
       "noSession": "Nu exista sesiune de parcare activa!",
       "active": "Sesiune Activa",
       "inactive": "Sesiune Inactiva",
@@ -184,7 +228,8 @@
       "title": "Setari",
       "language": "Limba",
       "logout": "Deconectare",
-      "history": "Istoric"
+      "history": "Istoric",
+      "printHistory": "Istoric printari"
     },
     "CameraScreen": {
       "title": "Camera",
@@ -199,7 +244,8 @@
       "weeks": "Saptamani",
       "months": "Luni",
       "years": "Ani",
-      "overtime": "Depasire"
+      "overtime": "Depasire",
+      "inspectionNote": "Nota de Constatare"
     },
     "LocationScreen": {
       "error": "Eroare",
@@ -266,7 +312,47 @@
     },
     "NotaConstatareScreen": {
       "title": "Nota de Constatare",
-      "desc": "Modul Nota de Constatare - In curand"
+      "desc": "Modul Nota de Constatare - In curand",
+      "selectViolationType": "Selectează Tipul de Încălcare",
+      "violationCode": "Codul Încălcării",
+      "photo": "Poză",
+      "photoHint": "În poză trebuie încadrată mașina cu numărul de înmatriculare cât mai clar.",
+      "continue": "Continua",
+      "locationPermissionRequired": "Este necesară permisiunea de locație pentru a continua.",
+      "addPhoto": "Adaugă poză",
+      "takePhoto": "Fă poză",
+      "changePhoto": "Schimbă poza",
+      "removePhoto": "Șterge poza",
+      "photoLoading": "Se încarcă poza...",
+      "photoLoadError": "Nu s-a putut încărca poza",
+      "cameraPermissionRequired": "Este necesară permisiunea camerei",
+      "requestPermission": "Cere permisiunea",
+      "requirements": "Informații Necesare",
+      "loading": "Se încarcă...",
+      "loadError": "Eroare la încărcarea datelor",
+      "noViolationCodes": "Nu există coduri de încălcare disponibile",
+      "selectFirst": "Vă rugăm selectați mai întâi un tip de încălcare",
+      "noRequirements": "Nu sunt necesare informații suplimentare",
+      "select": "Selectează...",
+      "error": "Eroare",
+      "networkError": "Eroare de conexiune la rețea",
+      "true": "Da",
+      "false": "Nu"
+    },
+    "PrintHistoryScreen": {
+      "main": "Istoric printari",
+      "desc": "Aici poti gasi ultimele note de constatare printate!",
+      "noHistory": "Nu s-a gasit niciun istoric de printare."
+    },
+    "PrintPreviewScreen": {
+      "title": "Previzualizare printare",
+      "printedId": "ID tipărire",
+      "loading": "Se încarcă previzualizarea...",
+      "missingTemplate": "Nu am primit template-ul de la server.",
+      "back": "Înapoi",
+      "print": "Printează",
+      "printNotImplemented": "Printarea va fi adăugată în pasul următor.",
+      "info": "Info"
     }
   }
 }

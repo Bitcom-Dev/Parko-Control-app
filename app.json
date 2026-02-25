@@ -23,7 +23,9 @@
       "bundleIdentifier": "com.bitcom.parkocontrol.bordeac03",
       "buildNumber": "1",
       "infoPlist": {
-        "UIViewControllerBasedStatusBarAppearance": true
+		"UIViewControllerBasedStatusBarAppearance": true,
+		"NSBluetoothAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to connect to Bluetooth receipt printers.",
+		"NSBluetoothPeripheralUsageDescription": "Allow $(PRODUCT_NAME) to connect to Bluetooth receipt printers."
       }
     },
     "android": {
@@ -33,7 +35,14 @@
       },
       "package": "com.bitcom.parkocontrol.bordeac03",
       "versionCode": 1,
-      "softwareKeyboardLayoutMode": "pan"
+    "softwareKeyboardLayoutMode": "pan",
+    "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -61,7 +70,8 @@
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location at all times",
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location when the app is in use"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

@@ -5,6 +5,10 @@ import { AppState, Alert } from 'react-native';
 import SplashScreen from '../screens/SplashScreen';
 import { useFonts } from 'expo-font';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import {
+	RobotoMono_400Regular,
+	RobotoMono_700Bold,
+} from '@expo-google-fonts/roboto-mono';
 import { black, gray, purple, white } from '../util/colors';
 import { useMessage } from '../util/messages';
 import { removeValue, retrieveValue, saveValue } from '../util/storage';
@@ -17,6 +21,8 @@ const Layout = () => {
 		Poppins_400Regular,
 		Poppins_500Medium,
 		Poppins_700Bold,
+		RobotoMono_400Regular,
+		RobotoMono_700Bold,
 	});	
 
 	const [isLoggedIn, setLoggedIn] = useState(false);
@@ -138,7 +144,7 @@ const Layout = () => {
 		} else {
 		  saveValue("user", JSON.stringify(user));
 		}
-		console.log(user);
+
 		if (user) {
 		  setLoggedIn(true);
 		} else {

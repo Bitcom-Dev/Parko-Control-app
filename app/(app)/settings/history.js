@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView, ActivityIndicator} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator} from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { useAuth, useSession } from '../../../context/userContext';
 import { useMessage } from '../../../util/messages';
@@ -19,28 +19,43 @@ const History = () => {
     const Verification = (props) => {
         const timestampToString = (ts) => {
             const date = new Date(ts);
-          
             const year = date.getFullYear();
-            const month = ('0' + (date.getMonth() + 1)).slice(-2); // Months are 0-based in JavaScript
+            const month = ('0' + (date.getMonth() + 1)).slice(-2);
             const day = ('0' + date.getDate()).slice(-2);
             const hours = ('0' + date.getHours()).slice(-2);
             const minutes = ('0' + date.getMinutes()).slice(-2);
-          
-            const dateString = `${hours}:${minutes} ${day}-${month}-${year} `;
-          
-            return dateString;
-          }
+            return `${hours}:${minutes} ${day}-${month}-${year} `;
+        }
 
         return (
-            <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(10)}} activeOpacity={.7} onPress={() => router.push({pathname: "/", params: {vehicleSelected: props.vehicle, tsSelected: props.ts , details: JSON.stringify({...props.details, active: props.active})}})}>
-                <View style={{flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: white, width: '90%', paddingVertical: resize(10), paddingHorizontal: resize(20), borderRadius: resize(15), gap: resize(5)}}>
-                    <View style={{flexDirection: 'row',alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
-                        <CustomTextMedium style={{...general.fontSize14}}>
+            <TouchableOpacity
+                style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(7)}}
+                activeOpacity={0.7}
+                onPress={() => router.push({pathname: "/", params: {vehicleSelected: props.vehicle, tsSelected: props.ts, details: JSON.stringify({...props.details, active: props.active})}})}
+            >
+                <View style={{
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: white,
+                    width: '90%',
+                    paddingVertical: resize(12),
+                    paddingHorizontal: resize(20),
+                    borderRadius: resize(15),
+                    gap: resize(5),
+                    elevation: 1,
+                    shadowColor: purple,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 2,
+                }}>
+                    <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+                        <CustomTextMedium style={{...general.fontSize14, color: black}}>
                             {props.vehicle}
                         </CustomTextMedium>
                         <MaterialCommunityIcons name={props.active ? "check-circle" : "close-circle"} size={resize(35)} color={props.active ? green : red} />
                     </View>
-                    <CustomTextRegular style={{...general.fontSize10, alignSelf: 'flex-end'}}>
+                    <CustomTextRegular style={{...general.fontSize10, alignSelf: 'flex-end', color: gray}}>
                         {timestampToString(props.ts * 1000)}
                     </CustomTextRegular>
                 </View>

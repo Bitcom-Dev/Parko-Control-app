@@ -32,6 +32,15 @@ const IndexSettings = () => {
                 </TouchableOpacity>
             </Link>
 
+            <Link href={"/settings/print_history"} asChild>
+                <TouchableOpacity style={{width: "85%", justifyContent: 'flex-start', alignItems: 'center', paddingTop: resize(20), paddingBottom: resize(5), borderBottomColor: gray, borderBottomWidth: resize(2), flexDirection: 'row', gap: resize(10), paddingHorizontal: resize(10)}}>
+                    <MaterialIcons name="print" size={resize(30)} color={purple} />
+                    <CustomTextMedium style={{...general.fontSize14}}>
+                        {strings.printHistory}
+                    </CustomTextMedium>
+                </TouchableOpacity>
+            </Link>
+
             <Link href={"/settings/language"} asChild>
                 <TouchableOpacity style={{width: "85%", justifyContent: 'flex-start', alignItems: 'center', paddingTop: resize(20), paddingBottom: resize(5), borderBottomColor: gray, borderBottomWidth: resize(2), flexDirection: 'row', gap: resize(10), paddingHorizontal: resize(10)}}>
                     <MaterialIcons name="language" size={resize(30)} color={purple} />

@@ -30,12 +30,12 @@ import { useAuth, useSession } from '../../../context/userContext';
 import { lprInstance } from '../../../util/instances';
 import { baseURL } from '../../../util/env';
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import { useFocusEffect, useNavigation } from 'expo-router';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 
 const LIMIT = 10;
 
 // ─── PlateCard ────────────────────────────────────────────────────────────────
-const PlateCard = ({ item, strings }) => {
+const PlateCard = ({ item, strings, onInspectionNote }) => {
 	const [thumbnailData, setThumbnailData] = useState(null);
 	const [fullImageData, setFullImageData] = useState(null);
 	const [imageError, setImageError] = useState(false);
@@ -107,7 +107,10 @@ const PlateCard = ({ item, strings }) => {
 	};
 
 	const handleInspectionNote = () => {
-		// TODO: integrate with backend action
+		if (typeof onInspectionNote === 'function') {
+			onInspectionNote(item);
+			return;
+		}
 		console.log('Nota de constatare:', item?.ID);
 	};
 
@@ -463,6 +466,7 @@ const LPRScreen = () => {
 	const auth = useAuth();
 	const userSession = useSession();
 	const navigation = useNavigation();
+	const router = useRouter();
 
 	const [plates, setPlates] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -497,6 +501,26 @@ const LPRScreen = () => {
 	const longitude = useMemo(() => userSession?.location?.longitude?.toString() || '', [userSession?.location?.longitude]);
 
 	const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+	const handleInspectionNote = useCallback(
+		(plateItem) => {
+			const licensePlate = plateItem?.plate ? String(plateItem.plate) : '';
+			console.log('Navigating to inspection note for plate:', plateItem.ID);
+			router.push({
+				pathname: '/nota-constatare',
+				params: {
+					license_plate: licensePlate,
+					lpr_id: plateItem?.ID != null ? String(plateItem.ID) : undefined,
+					image_path: plateItem?.path != null ? String(plateItem.path) : undefined,
+					source: 'lpr',
+					preset_violation_type: 'unpaid_parking',
+					preset_violation_code: 'unpaid_parking',
+					lock_violation_type: '1',
+				},
+			});
+		},
+		[router]
+	);
 
 	const fetchPlates = useCallback(
 		(pageNum = 1) => {
@@ -966,7 +990,9 @@ const LPRScreen = () => {
 					<FlatList
 						ref={flatListRef}
 						data={plates}
-						renderItem={({ item }) => <PlateCard item={item} strings={strings} />}
+						renderItem={({ item }) => (
+							<PlateCard item={item} strings={strings} onInspectionNote={handleInspectionNote} />
+						)}
 						keyExtractor={(item) =>
 							item.ID != null ? item.ID.toString() : Math.random().toString()
 						}

@@ -80,6 +80,17 @@ export default function Root() {
 					animationTypeForReplace: 'push'
 				}}
 			/>
+			<Stack.Screen 
+				name='print-preview'
+				options={{
+					headerShown: Platform.OS === 'android' ? false : true,
+					headerBackTitleVisible: false,
+					animation: 'slide_from_right',
+					gestureEnabled: true,
+					animationDuration: 50,
+					animationTypeForReplace: 'push'
+				}}
+			/>
 		</Stack>
 	);
 }

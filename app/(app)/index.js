@@ -24,6 +24,21 @@ export default function Index() {
 	const userSession = useSession();
 	const [menuVisible, setMenuVisible] = useState(false);
 
+	const handleInspectionNote = useCallback(() => {
+		const licensePlate = (session?.vehicle || vehicle || '').toString().trim();
+		if (!licensePlate) return;
+		router.push({
+			pathname: '/nota-constatare',
+			params: {
+				license_plate: licensePlate,
+				source: 'home',
+				preset_violation_type: 'unpaid_parking',
+				preset_violation_code: 'unpaid_parking',
+				lock_violation_type: '1',
+			},
+		});
+	}, [session?.vehicle, vehicle]);
+
 
 	const loadData = () => {
 		if (loadingHistory)
@@ -256,14 +271,14 @@ export default function Index() {
 								</CustomTextMedium>
 							</View>
 						</View> : null}
-						{session.zone ? <View style={{flexDirection: 'row',  gap: resize(10), alignItems: 'center', flexBasis: resize(150)}}>
-							<FontAwesome6 name="map-location-dot" size={resize(30)} color={gray} style={{paddingLeft: resize(5)}}/>
+						{session.endTime ? <View style={{flexDirection: 'row',  gap: resize(10), alignItems: 'center', flexBasis: resize(150)}}>
+							<MaterialCommunityIcons name="timer-sand-complete" size={resize(40)} color={gray} />
 							<View>
 								<CustomTextBold style={{...general.fontSize4, color: purple}}>
-									{strings.zone} :
+									{strings.overtime} :
 								</CustomTextBold>
 								<CustomTextMedium style={{...general.fontSize14}}>
-									{session.zone}
+									{overtime(session.endTime)}
 								</CustomTextMedium>
 							</View>
 						</View> : null}
@@ -310,17 +325,28 @@ export default function Index() {
 								</CustomTextMedium>
 							</View>
 						</View> : null}
-						{session.zone ? <View style={{flexDirection: 'row',  gap: resize(10), alignItems: 'center',flexBasis: resize(150)}}>
-							<MaterialCommunityIcons name="timer-sand-complete" size={resize(40)} color={gray} />
+						<TouchableOpacity
+							activeOpacity={0.8}
+							onPress={handleInspectionNote}
+							disabled={!(session?.vehicle || vehicle)}
+							style={{
+								flexDirection: 'row',
+								gap: resize(10),
+								alignItems: 'center',
+								flexBasis: resize(150),
+								justifyContent: 'flex-start',
+							}}
+						>
+							<MaterialCommunityIcons name="file-document-edit-outline" size={resize(35)} color={orange} />
 							<View>
 								<CustomTextBold style={{...general.fontSize4, color: purple}}>
-									{strings.overtime} :
+									{strings.notaConstatare}
 								</CustomTextBold>
-								<CustomTextMedium style={{...general.fontSize14}}>
-									{overtime(session.endTime)}
+								<CustomTextMedium style={{...general.fontSize10, color: gray}}>
+									{session?.vehicle || vehicle || ''}
 								</CustomTextMedium>
 							</View>
-						</View> : null}
+						</TouchableOpacity>
 					</View>
 				</View> 
 				: null
