@@ -21,7 +21,7 @@ import {
 } from 'react-native-thermal-receipt-printer-image-qr';
 
 import { resize, general } from '../../../util/style';
-import { purple, white, black, lightGray, orange } from '../../../util/colors';
+import { purple, white, black, orange, green, red } from '../../../util/colors';
 import { CustomTextBold, CustomTextMedium } from '../../../util/CustomText';
 import { useMessage } from '../../../util/messages';
 
@@ -33,6 +33,8 @@ import { getValueAsync, setValueAsync, removeValueAsync } from '../../../util/st
 const DEFAULT_DOTS = 832;
 const DOTS_PER_CHAR_A = 12;
 const DOTS_PER_CHAR_B = 9;
+const DOTS_HEIGHT_A = 24;
+const DOTS_HEIGHT_B = 17;
 
 // Use a bundled monospace font with full Romanian glyph coverage.
 // Loaded globally in `app/_layout.js` via `useFonts`.
@@ -301,45 +303,35 @@ const parseReceiptMarkup = (wrappedTemplate) => {
 	if (currentLineRuns.length > 0) blocks.push({ type: 'text', align: st.align, runs: currentLineRuns });
 	return blocks;
 };
+const getCharDotsForStyle = (runStyle) => (runStyle?.font === 'b' ? DOTS_PER_CHAR_B : DOTS_PER_CHAR_A);
 
-const useMonospaceCalibration = ({ paperWidthPx, maxDots }) => {
-	const [fontA, setFontA] = useState(14);
-	const fontBRatio = DOTS_PER_CHAR_B / DOTS_PER_CHAR_A; // 9/12 = 0.75
-	const fontB = useMemo(() => clamp(fontA * fontBRatio, 9, 22), [fontA]);
-	// Small safety margin to avoid RN soft-wrap due to font fallback/metrics.
-	// This keeps line breaks printer-faithful (we still wrap by dots), but gives
-	// a tiny extra whitespace buffer in the visual preview.
-	const FONT_SAFETY = 0.95;
+const getRunDotsWidth = ({ text, style }) => {
+	const chars = String(text || '').length;
+	const widthScale = style?.width2x ? 2 : 1;
+	return chars * getCharDotsForStyle(style) * widthScale;
+};
 
-	const charsA = Math.max(10, Math.floor(maxDots / DOTS_PER_CHAR_A)); // ~69
-	const targetCharWidthA = (paperWidthPx / charsA) * FONT_SAFETY;
+const getRunDotsHeight = (runStyle) => {
+	const baseHeight = runStyle?.font === 'b' ? DOTS_HEIGHT_B : DOTS_HEIGHT_A;
+	const heightScale = runStyle?.height2x ? 2 : 1;
+	return baseHeight * heightScale;
+};
 
-	// IMPORTANT: use a "wide" sample that includes Romanian diacritics.
-	// If the chosen monospace font lacks glyphs and Android falls back per-character,
-	// widths can change and RN may soft-wrap. This sample makes calibration more robust.
-	const sampleA = useMemo(() => {
-		const pattern = 'MWĂȚȘÂÎățșâî0123456789';
-		let out = '';
-		while (out.length < charsA) out += pattern;
-		return out.slice(0, charsA);
-	}, [charsA]);
+const buildTextLineLayout = ({ runs, align, maxDots }) => {
+	const cleanRuns = Array.isArray(runs)
+		? runs.filter((r) => r && typeof r.text === 'string' && r.style)
+		: [];
+	if (cleanRuns.length === 0) return null;
 
-	const onMeasureA = (w) => {
-		if (!w || w <= 0 || !paperWidthPx) return;
-		const measuredChar = w / charsA;
-		if (!measuredChar) return;
-		const scale = clamp(targetCharWidthA / measuredChar, 0.7, 1.5);
-		setFontA((prev) => {
-			const next = clamp(prev * scale, 10, 26);
-			return Math.abs(prev - next) > 0.2 ? next : prev;
-		});
-	};
+	const lineHeightDots = cleanRuns.reduce(
+		(mx, run) => Math.max(mx, getRunDotsHeight(run.style)),
+		DOTS_HEIGHT_A,
+	);
 
 	return {
-		fontA,
-		fontB,
-		sampleA,
-		onMeasureA,
+		runs: cleanRuns,
+		align,
+		lineHeightDots,
 	};
 };
 
@@ -385,65 +377,49 @@ const ReceiptImage = ({ base64OrPlaceholder, desiredWidthPx, align }) => {
 	);
 };
 
-const alignToTextAlign = (align) => (align === 'center' ? 'center' : align === 'right' ? 'right' : 'left');
 const alignToAlignSelf = (align) => (align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start');
 
-const resolveRunStyle = ({ runStyle, fontA, fontB }) => {
-	const base = runStyle.font === 'b' ? fontB : fontA;
-	const fontSize = base;
-	const heightScale = runStyle.height2x ? 2 : 1;
-	const widthScale = runStyle.width2x ? 2 : 1;
-	const lineHeight = Math.ceil(fontSize * 1.22 * heightScale);
-
-	// ESC/POS 2width/2height are independent. We preview them with transforms.
-	const out = {
-		fontFamily: runStyle.bold ? monoFontBold : monoFontRegular,
+const resolveRunStyle = ({ runStyle, pxPerDot, lineHeightPx }) => {
+	const baseHeightDots = runStyle?.font === 'b' ? DOTS_HEIGHT_B : DOTS_HEIGHT_A;
+	const fontSize = Math.max(4, Math.floor(baseHeightDots * pxPerDot * 0.9));
+	const widthScale = runStyle?.width2x ? 2 : 1;
+	const heightScale = runStyle?.height2x ? 2 : 1;
+	return {
+		fontFamily: runStyle?.bold ? monoFontBold : monoFontRegular,
 		fontSize,
-		lineHeight,
+		lineHeight: lineHeightPx,
+		textAlignVertical: 'center',
 		color: '#111',
-		textDecorationLine: runStyle.underline ? 'underline' : 'none',
+		textDecorationLine: runStyle?.underline ? 'underline' : 'none',
+		includeFontPadding: false,
+		...(widthScale !== 1 || heightScale !== 1
+			? { transform: [{ scaleX: widthScale }, { scaleY: heightScale }] }
+			: null),
 	};
-	if (widthScale !== 1 || heightScale !== 1) {
-		out.transform = [{ scaleX: widthScale }, { scaleY: heightScale }];
-	}
-	return out;
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 const PrintPreviewScreen = () => {
-	const { PrintPreviewScreen: strings, NotaConstatareScreen: commonStrings } = useMessage();
+	const { PrintPreviewScreen: strings } = useMessage();
 	const [data, setData] = useState(null);
 	const [isPrinting, setIsPrinting] = useState(false);
+	const [isReconnectingPrinter, setIsReconnectingPrinter] = useState(false);
 	const [printerModalOpen, setPrinterModalOpen] = useState(false);
 	const [bleDevices, setBleDevices] = useState([]);
 	const [bleLoading, setBleLoading] = useState(false);
 	const [bleError, setBleError] = useState(null);
-	// React Native may still soft-wrap inside a "single" wrapped line due to subtle
-	// font/layout differences. Auto-decrease wrap width only if we detect a wrap.
-	const [wrapFitPct, setWrapFitPct] = useState(100);
-	// Prefer not to shrink too much (keeps the preview printer-faithful), but if RN
-	// still soft-wraps we progressively lower this floor until the wrap stops.
-	const [wrapFitFloorPct, setWrapFitFloorPct] = useState(75);
-	const wrapAutoRef = useRef({ lastSig: null, lastAt: 0, adjustments: 0 });
-	const HARD_MIN_WRAP_FIT = 70;
+	const [savedPrinterMac, setSavedPrinterMac] = useState(null);
+	const [savedPrinterName, setSavedPrinterName] = useState('');
+	const [printerConnectionStatus, setPrinterConnectionStatus] = useState('idle');
+	const [printerConnectionMessage, setPrinterConnectionMessage] = useState('');
+	const isConnectingPrinterRef = useRef(false);
 
 	useEffect(() => {
 		const d = getPrintPreview();
 		setData(d);
 	}, []);
 
-	// Reset the auto-fit when the template changes.
-	useEffect(() => {
-		wrapAutoRef.current = { lastSig: null, lastAt: 0, adjustments: 0 };
-		setWrapFitPct(100);
-		setWrapFitFloorPct(75);
-	}, [data?.printed_nota, data?.dots_printer]);
-
 	const maxDots = data?.dots_printer ? Number(data.dots_printer) : DEFAULT_DOTS;
-	const wrapDots = useMemo(() => {
-		if (!maxDots || maxDots <= 0) return DEFAULT_DOTS;
-		return clampInt((maxDots * wrapFitPct) / 100, 100, maxDots);
-	}, [maxDots, wrapFitPct]);
 
 	const screenWidth = Dimensions.get('window').width;
 	// Scale paper width by printer dot width so different printers “feel” different.
@@ -451,9 +427,6 @@ const PrintPreviewScreen = () => {
 	const maxPaperWidthPx = clamp(screenWidth - 24, 260, 520);
 	const paperWidthScale = maxDots > 0 ? maxDots / DEFAULT_DOTS : 1;
 	const paperWidthPx = clamp(maxPaperWidthPx * paperWidthScale, 220, maxPaperWidthPx);
-	// IMPORTANT: the actual usable text width is smaller than `paperWidthPx` because
-	// `styles.paper` adds horizontal padding. If calibration uses the outer width,
-	// React Native may still soft-wrap text (looks like an “extra newline”).
 	const paperPaddingX = 10; // keep in sync with `styles.paper.paddingHorizontal`
 	const contentWidthPx = clamp(paperWidthPx - paperPaddingX * 2, 200, paperWidthPx);
 	const pxPerDot = useMemo(() => {
@@ -463,70 +436,169 @@ const PrintPreviewScreen = () => {
 
 	const wrappedTemplate = useMemo(() => {
 		if (!data?.printed_nota) return '';
-		return wordWrapByDots(String(data.printed_nota), wrapDots);
-	}, [data?.printed_nota, wrapDots]);
-
-	// Print jobs use the full printer width (maxDots), NOT the reduced wrapDots used
-	// for preview. wrapDots shrinks via soft-wrap detection so the RN preview fits,
-	// but the physical printer can always use its full dot width.
-	const printTemplate = useMemo(() => {
-		if (!data?.printed_nota) return '';
 		return wordWrapByDots(String(data.printed_nota), maxDots);
 	}, [data?.printed_nota, maxDots]);
+
+	const printTemplate = wrappedTemplate;
 
 	const blocks = useMemo(() => {
 		if (!wrappedTemplate) return [];
 		return parseReceiptMarkup(wrappedTemplate);
 	}, [wrappedTemplate]);
 
-	const calib = useMonospaceCalibration({ paperWidthPx: contentWidthPx, maxDots });
+	const resetBleConnection = useCallback(async () => {
+		if (!BLEPrinter) return;
+		const maybeCalls = [
+			BLEPrinter.closeConn,
+			BLEPrinter.closeConnection,
+			BLEPrinter.disconnectPrinter,
+			BLEPrinter.disconnect,
+		];
+		for (const fn of maybeCalls) {
+			if (typeof fn !== 'function') continue;
+			try {
+				await fn();
+			} catch (_e) {
+				// best-effort hard reset
+			}
+		}
+	}, []);
 
-	const onLineTextLayout = useCallback(
-		(e) => {
-			// If any line wraps unexpectedly, shrink dot budget and re-wrap.
-			const lines = e?.nativeEvent?.lines;
-			if (!Array.isArray(lines) || lines.length <= 1) return;
+	const probeBleConnection = useCallback(async () => {
+		if (!BLEPrinter || !THERMAL_COMMANDS) {
+			throw new Error('Modulul de imprimantă nu este disponibil.');
+		}
+		await BLEPrinter.printBill(
+			withPrinterCodeTable(
+				THERMAL_COMMANDS.HARDWARE.HW_INIT + THERMAL_COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT,
+				THERMAL_COMMANDS,
+			),
+			PRINTER_PRINT_OPTS,
+		);
+	}, []);
 
-			const now = Date.now();
-			// Throttle + dedupe to avoid infinite adjustment loops.
-			// IMPORTANT: use wrapDots instead of wrapFitPct here. A -1% change on 832 dots
-			// is ~8 dots (< 1 Font-A char), which often doesn't change the wrapped template.
-			// If the template doesn't change, RN may not re-fire onTextLayout, so we need
-			// each adjustment to be meaningful.
-			const sig = `${wrapDots}|${lines.map((l) => l?.text ?? '').join('|')}`;
-			if (wrapAutoRef.current.lastSig === sig) return;
-			if (now - wrapAutoRef.current.lastAt < 80) return;
-			wrapAutoRef.current.lastSig = sig;
-			wrapAutoRef.current.lastAt = now;
-			wrapAutoRef.current.adjustments += 1;
+	const connectToSavedPrinter = useCallback(
+		async ({ openPickerOnMissing = false } = {}) => {
+			if (isConnectingPrinterRef.current) {
+				return { ok: false, reason: 'busy' };
+			}
+			isConnectingPrinterRef.current = true;
 
-			// Decrease by at least ~10 Font-A characters worth of dots.
-			// For 832 dots: ceil((12*10)/832*100) ≈ 15%.
-			const minChars = 10;
-			const minPctTenChars = clampInt(
-				Math.ceil(((DOTS_PER_CHAR_A * minChars) / Math.max(1, maxDots)) * 100),
-				1,
-				40,
-			);
-			const overflowLines = clampInt(lines.length - 1, 1, 6);
-			const decPct = clampInt(overflowLines * minPctTenChars, minPctTenChars, 60);
+			if (Platform.OS !== 'android') {
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage('Conectarea BLE este disponibilă doar pe Android.');
+				isConnectingPrinterRef.current = false;
+				return { ok: false, reason: 'unsupported-platform' };
+			}
 
-			setWrapFitPct((p) => {
-				// If we're already at the current floor and still wrapping, lower the floor.
-				// This avoids getting stuck at 75% when a device/font makes glyphs wider.
-				let floor = wrapFitFloorPct;
-				if (p <= floor && floor > HARD_MIN_WRAP_FIT) {
-					const nextFloor = clampInt(floor - minPctTenChars, HARD_MIN_WRAP_FIT, 100);
-					floor = nextFloor;
-					setWrapFitFloorPct(nextFloor);
+			setPrinterConnectionStatus('checking');
+			setPrinterConnectionMessage('Se verifică conexiunea cu imprimanta...');
+
+			const okPermissions = await ensureAndroidBluetoothPermissions();
+			if (!okPermissions) {
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage('Lipsesc permisiunile Bluetooth.');
+				isConnectingPrinterRef.current = false;
+				return { ok: false, reason: 'permissions' };
+			}
+
+			const [mac, name] = await Promise.all([
+				getValueAsync(STORAGE_KEYS.bleMac),
+				getValueAsync(STORAGE_KEYS.bleName),
+			]);
+
+			setSavedPrinterMac(mac || null);
+			setSavedPrinterName(name ? String(name) : '');
+
+			if (!mac) {
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage('Nu există imprimantă salvată.');
+				if (openPickerOnMissing) setPrinterModalOpen(true);
+				isConnectingPrinterRef.current = false;
+				return { ok: false, reason: 'missing-saved-printer' };
+			}
+
+			try {
+				await resetBleConnection();
+				await BLEPrinter.init();
+				const list = await BLEPrinter.getDeviceList();
+				const hit = findBleDeviceByMac(list, mac);
+
+				if (!hit) {
+					setPrinterConnectionStatus('disconnected');
+					setPrinterConnectionMessage('Imprimanta salvată nu este disponibilă acum.');
+					setBleDevices(Array.isArray(list) ? list : []);
+					if (openPickerOnMissing) setPrinterModalOpen(true);
+					return { ok: false, reason: 'device-not-found' };
 				}
-				return clampInt(p - decPct, floor, 100);
-			});
 
+				const deviceMac = String(getDeviceMac(hit));
+				await BLEPrinter.connectPrinter(deviceMac);
+				await probeBleConnection();
+
+				const nextName = String(hit?.device_name || hit?.name || name || 'Imprimantă');
+				setSavedPrinterMac(deviceMac);
+				setSavedPrinterName(nextName);
+				await setValueAsync(STORAGE_KEYS.bleMac, deviceMac);
+				if (nextName) await setValueAsync(STORAGE_KEYS.bleName, nextName);
+
+				setPrinterConnectionStatus('connected');
+				setPrinterConnectionMessage(`Conectat: ${nextName}`);
+				return { ok: true, device: hit, mac: deviceMac, name: nextName };
+			} catch (e) {
+				console.warn('[print-preview] connect saved printer error', e);
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage(`Conexiune invalidă: ${String(e?.message || e)}`);
+				return { ok: false, reason: 'connect-failed', error: e };
+			} finally {
+				isConnectingPrinterRef.current = false;
+			}
 		},
-
-		[HARD_MIN_WRAP_FIT, maxDots, wrapDots, wrapFitFloorPct],
+		[probeBleConnection, resetBleConnection],
 	);
+
+	useEffect(() => {
+		if (Platform.OS !== 'android') return;
+
+		const run = async () => {
+			const savedMac = await getValueAsync(STORAGE_KEYS.bleMac);
+			const savedName = await getValueAsync(STORAGE_KEYS.bleName);
+			setSavedPrinterMac(savedMac || null);
+			setSavedPrinterName(savedName ? String(savedName) : '');
+			if (savedMac) {
+				await connectToSavedPrinter({ openPickerOnMissing: false });
+			} else {
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage('Nu există imprimantă salvată.');
+			}
+		};
+
+		run();
+	}, [connectToSavedPrinter]);
+
+	const onPressReconnectPrinter = useCallback(async () => {
+		if (isPrinting) return;
+		setIsReconnectingPrinter(true);
+		const result = await connectToSavedPrinter({ openPickerOnMissing: true });
+		if (result?.ok) {
+			Alert.alert('Imprimantă', 'Conexiunea cu imprimanta a fost refăcută.');
+		}
+		setIsReconnectingPrinter(false);
+	}, [connectToSavedPrinter, isPrinting]);
+
+	const printerStatusText = useMemo(() => {
+		if (printerConnectionStatus === 'connected') {
+			return printerConnectionMessage || 'Telefon conectat la imprimantă.';
+		}
+		if (printerConnectionStatus === 'checking') {
+			return printerConnectionMessage || 'Se verifică conexiunea...';
+		}
+		if (savedPrinterMac) {
+			const printerName = savedPrinterName ? ` (${savedPrinterName})` : '';
+			return `Telefon neconectat la imprimantă${printerName}.`;
+		}
+		return printerConnectionMessage || 'Nu există imprimantă salvată.';
+	}, [printerConnectionMessage, printerConnectionStatus, savedPrinterMac, savedPrinterName]);
 
 	const onPressPrint = useCallback(() => {
 		const run = async () => {
@@ -573,39 +645,15 @@ const PrintPreviewScreen = () => {
 					return size;
 				};
 
-				const savedMac = await getValueAsync(STORAGE_KEYS.bleMac);
-				if (!savedMac) {
-					// First time: open picker.
-					setPrinterModalOpen(true);
-					setBleError(null);
-					setBleLoading(true);
-					try {
-						await BLEPrinter.init();
-						const list = await BLEPrinter.getDeviceList();
-						setBleDevices(Array.isArray(list) ? list : []);
-					} catch (e) {
-						console.warn('[print-preview] BLE getDeviceList error', e);
-						setBleDevices([]);
-						setBleError(String(e?.message || e));
-					} finally {
-						setBleLoading(false);
+				const connection = await connectToSavedPrinter({ openPickerOnMissing: true });
+				if (!connection?.ok) {
+					if (connection?.reason === 'device-not-found') {
+						setBleError(
+							'Imprimanta salvată nu a fost găsită prin BLE scan. Dacă Datecs DPP-450 este Bluetooth clasic (SPP), nu va apărea aici.',
+						);
 					}
 					return;
 				}
-
-				// Attempt print with saved printer.
-				await BLEPrinter.init();
-				const list = await BLEPrinter.getDeviceList();
-				const hit = findBleDeviceByMac(list, savedMac);
-				if (!hit) {
-					setPrinterModalOpen(true);
-					setBleDevices(Array.isArray(list) ? list : []);
-					setBleError(
-						'Imprimanta salvată nu a fost găsită prin BLE scan. Dacă Datecs DPP-450 este Bluetooth clasic (SPP), nu va apărea aici.',
-					);
-					return;
-				}
-				await BLEPrinter.connectPrinter(String(getDeviceMac(hit)));
 
 				// IMPORTANT: use full printer width (maxDots) for print jobs, not the
 				// reduced wrapDots used only for preview soft-wrap detection.
@@ -669,6 +717,8 @@ const PrintPreviewScreen = () => {
 				);
 			} catch (e) {
 				console.warn('[print-preview] print error', e);
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage(String(e?.message || e));
 				Alert.alert(
 					'Tipărire',
 					`Eroare la tipărire: ${String(e?.message || e)}\n\nDacă imprimanta este Bluetooth clasic (SPP), lista BLE nu o va vedea.`,
@@ -680,7 +730,7 @@ const PrintPreviewScreen = () => {
 		};
 
 		run();
-	}, [data?.printed_nota, maxDots, printTemplate]);
+	}, [connectToSavedPrinter, data?.printed_nota, maxDots, printTemplate]);
 
 	const onRefreshBleDevices = useCallback(async () => {
 		setBleError(null);
@@ -725,9 +775,13 @@ const PrintPreviewScreen = () => {
 
 				await setValueAsync(STORAGE_KEYS.bleMac, String(mac));
 				if (name) await setValueAsync(STORAGE_KEYS.bleName, String(name));
+				setSavedPrinterMac(String(mac));
+				setSavedPrinterName(String(name || 'Imprimantă'));
 				const COMMANDS = THERMAL_COMMANDS;
 				await BLEPrinter.init();
 				await BLEPrinter.connectPrinter(String(mac));
+				setPrinterConnectionStatus('connected');
+				setPrinterConnectionMessage(`Conectat: ${String(name || 'Imprimantă')}`);
 
 				const jobs = buildThermalPrintJobsFromWrappedTemplate({
 					wrappedTemplate: printTemplate,
@@ -776,6 +830,8 @@ const PrintPreviewScreen = () => {
 				);
 			} catch (e) {
 				console.warn('[print-preview] pick+print error', e);
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage(String(e?.message || e));
 				Alert.alert('Tipărire', `Eroare: ${String(e?.message || e)}`);
 			} finally {
 				setIsPrinting(false);
@@ -876,17 +932,6 @@ const PrintPreviewScreen = () => {
 				</View>
 			</Modal>
 
-			{/* Hidden calibration */}
-			<View style={styles.calib} pointerEvents="none">
-				<Text
-					allowFontScaling={false}
-					style={{ fontFamily: monoFontRegular, fontSize: calib.fontA, color: 'transparent' }}
-					onLayout={(e) => calib.onMeasureA(e?.nativeEvent?.layout?.width)}
-				>
-					{calib.sampleA}
-				</Text>
-			</View>
-
 			<ScrollView
 				style={styles.scroll}
 				contentContainerStyle={styles.scrollContent}
@@ -894,7 +939,7 @@ const PrintPreviewScreen = () => {
 			>
 				<View style={styles.meta}>
 					<Text style={styles.metaText} allowFontScaling={false}>
-						{`Wrap fit (auto): ${wrapFitPct}%  ·  wrap dots: ${wrapDots}`}
+						{`Preview 1:1 by dots  ·  wrap dots: ${maxDots}`}
 					</Text>
 					<Text style={styles.metaText} allowFontScaling={false}>
 						{`dots: ${maxDots}  ·  content: ${Math.round(contentWidthPx)}px  ·  ${pxPerDot ? pxPerDot.toFixed(3) : '0.000'} px/dot`}
@@ -902,12 +947,10 @@ const PrintPreviewScreen = () => {
 				</View>
 
 				<View style={[styles.paper, { width: paperWidthPx }]}>
-						{(() => {
-							let textLineIdx = -1;
-							return blocks.map((b, idx) => {
+					{blocks.map((b, idx) => {
 						if (!b || b.type === 'blank') {
-							const lh = Math.ceil(calib.fontA * 1.22);
-							return <View key={`blank-${idx}`} style={{ height: lh }} />;
+							const blankLinePx = Math.max(6, Math.round(DOTS_HEIGHT_A * pxPerDot));
+							return <View key={`blank-${idx}`} style={{ height: blankLinePx }} />;
 						}
 
 						if (b.type === 'img') {
@@ -929,75 +972,43 @@ const PrintPreviewScreen = () => {
 							? b.runs.filter((r) => r && typeof r.text === 'string' && r.style)
 							: [];
 						if (b.type !== 'text' || runs.length === 0) {
-							const lh = Math.ceil(calib.fontA * 1.22);
-							return <View key={`blank-${idx}`} style={{ height: lh }} />;
+							const blankLinePx = Math.max(6, Math.round(DOTS_HEIGHT_A * pxPerDot));
+							return <View key={`blank-${idx}`} style={{ height: blankLinePx }} />;
 						}
-								textLineIdx++;
-						const textAlign = alignToTextAlign(b.align);
-						const maxLineHeight = runs.reduce((mx, run) => {
-							const base = run.style.font === 'b' ? calib.fontB : calib.fontA;
-							const heightScale = run.style.height2x ? 2 : 1;
-							return Math.max(mx, Math.ceil(base * 1.22 * heightScale));
-						}, Math.ceil(calib.fontA * 1.22));
-						return (
-							<View key={`txt-${idx}`} style={{ minHeight: maxLineHeight }}>
-								{/*
-									Hidden measurement line:
-									- Allows wrapping so we can detect RN soft-wrap via onTextLayout
-									- Drives wrapFitPct auto-tightening
-								*/}
-								<Text
-									allowFontScaling={false}
-									style={[
-										styles.line,
-										styles.measureLine,
-										{
-											width: contentWidthPx,
-											maxWidth: contentWidthPx,
-											textAlign,
-											lineHeight: maxLineHeight,
-											flexShrink: 0,
-										},
-									]}
-									onTextLayout={onLineTextLayout}
-									textBreakStrategy="simple"
-									android_hyphenationFrequency="none"
-								>
-									{runs.map((run, j) => (
-										<Text
-											key={`m-${idx}-${j}`}
-											allowFontScaling={false}
-											style={resolveRunStyle({ runStyle: run.style, fontA: calib.fontA, fontB: calib.fontB })}
-										>
-											{run.text}
-										</Text>
-									))}
-								</Text>
 
-								{/*
-									Visible line: force single line (no RN soft-wrap).
-									If our dot-wrapper is correct, this will never clip.
-								*/}
+						const lineLayout = buildTextLineLayout({
+							runs,
+							align: b.align,
+							maxDots,
+						});
+						if (!lineLayout) {
+							const blankLinePx = Math.max(6, Math.round(DOTS_HEIGHT_A * pxPerDot));
+							return <View key={`blank-${idx}`} style={{ height: blankLinePx }} />;
+						}
+
+						const lineHeightPx = Math.max(6, Math.round(lineLayout.lineHeightDots * pxPerDot));
+						const textAlign =
+							lineLayout.align === 'center'
+								? 'center'
+								: lineLayout.align === 'right'
+									? 'right'
+									: 'left';
+						return (
+							<View key={`txt-${idx}`} style={{ minHeight: lineHeightPx, width: contentWidthPx }}>
 								<Text
 									allowFontScaling={false}
+									numberOfLines={1}
+									ellipsizeMode="clip"
 									style={[
-										styles.line,
-										{
-											width: contentWidthPx,
-											maxWidth: contentWidthPx,
-											textAlign,
-											lineHeight: maxLineHeight,
-											flexShrink: 0,
-										},
+										styles.lineText,
+										{ left: 0, width: contentWidthPx, lineHeight: lineHeightPx, textAlign },
 									]}
-									textBreakStrategy="simple"
-									android_hyphenationFrequency="none"
 								>
-									{runs.map((run, j) => (
+									{lineLayout.runs.map((run, j) => (
 										<Text
 											key={`${idx}-${j}`}
 											allowFontScaling={false}
-											style={resolveRunStyle({ runStyle: run.style, fontA: calib.fontA, fontB: calib.fontB })}
+											style={resolveRunStyle({ runStyle: run.style, pxPerDot, lineHeightPx })}
 										>
 											{run.text}
 										</Text>
@@ -1005,12 +1016,41 @@ const PrintPreviewScreen = () => {
 								</Text>
 							</View>
 						);
-							});
-						})()}
+					})}
 				</View>
 			</ScrollView>
 
 			<View style={styles.bottomBar}>
+				<View style={styles.connectionRow}>
+					<View
+						style={[
+							styles.connectionDot,
+							printerConnectionStatus === 'connected'
+								? styles.connectionDotConnected
+								: printerConnectionStatus === 'checking'
+									? styles.connectionDotChecking
+									: styles.connectionDotDisconnected,
+						]}
+					/>
+					<CustomTextMedium style={styles.connectionText}>{printerStatusText}</CustomTextMedium>
+				</View>
+				<View style={styles.buttonsRow}>
+					<Pressable
+						onPress={onPressReconnectPrinter}
+						disabled={isPrinting || isReconnectingPrinter}
+						style={({ pressed }) => [
+							styles.reconnectButton,
+							pressed && styles.printButtonPressed,
+							(isPrinting || isReconnectingPrinter) && styles.printButtonDisabled,
+						]}
+						hitSlop={8}
+					>
+						{isReconnectingPrinter ? (
+							<ActivityIndicator size="small" color={purple} />
+						) : (
+							<CustomTextBold style={styles.reconnectButtonText}>Reconectează</CustomTextBold>
+						)}
+					</Pressable>
 				<Pressable
 					onPress={onPressPrint}
 					disabled={isPrinting}
@@ -1029,6 +1069,7 @@ const PrintPreviewScreen = () => {
 						</CustomTextBold>
 					)}
 				</Pressable>
+				</View>
 			</View>
 		</View>
 	);
@@ -1076,7 +1117,51 @@ const styles = StyleSheet.create({
 		borderTopWidth: 1,
 		borderTopColor: '#E1E4EA',
 	},
+	connectionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+		gap: 8,
+	},
+	connectionDot: {
+		width: 9,
+		height: 9,
+		borderRadius: 5,
+	},
+	connectionDotConnected: {
+		backgroundColor: green,
+	},
+	connectionDotChecking: {
+		backgroundColor: orange,
+	},
+	connectionDotDisconnected: {
+		backgroundColor: red,
+	},
+	connectionText: {
+		flex: 1,
+		fontSize: 12,
+		color: black,
+	},
+	buttonsRow: {
+		flexDirection: 'row',
+		gap: 8,
+	},
+	reconnectButton: {
+		flex: 1,
+		height: 48,
+		borderRadius: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: white,
+		borderWidth: 1,
+		borderColor: purple,
+	},
+	reconnectButtonText: {
+		color: purple,
+		fontSize: 15,
+	},
 	printButton: {
+		flex: 1,
 		height: 48,
 		borderRadius: 12,
 		alignItems: 'center',
@@ -1201,12 +1286,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#667085',
 	},
-	calib: {
-		position: 'absolute',
-		left: -9999,
-		top: -9999,
-		opacity: 0,
-	},
 	paper: {
 		backgroundColor: '#FEFEFE',
 		borderRadius: 10,
@@ -1223,15 +1302,11 @@ const styles = StyleSheet.create({
 	block: {
 		marginVertical: 2,
 	},
-	line: {
-		color: '#111',
-		includeFontPadding: false,
-	},
-	measureLine: {
+	lineText: {
 		position: 'absolute',
-		left: -10000,
 		top: 0,
-		opacity: 0,
+		includeFontPadding: false,
+		color: '#111',
 	},
 	imgPlaceholder: {
 		borderWidth: 1,

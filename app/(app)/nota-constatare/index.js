@@ -6,7 +6,7 @@ import useMessage from '../../../util/messages';
 import { CustomTextMedium, CustomTextRegular, CustomTextBold } from '../../../util/CustomText';
 import { useAuth } from '../../../context/userContext';
 import { lprInstance, notaConstatareInstance } from '../../../util/instances';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -16,8 +16,12 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as jpeg from 'jpeg-js';
 import { Buffer } from 'buffer';
 import { setPrintPreview } from '../../../util/printPreviewStore';
+import { getLocationLabelFromCoords } from '../../../util/reverseGeocode';
 
 const NotaConstatareScreen = () => {
+	const DEFAULT_STRING_MASK = '_______________';
+	const STRING_MASK_EXCLUDED_KEYS = new Set(['days_to_due', 'POZA_MASINA_BASE64']);
+
 	const { NotaConstatareScreen: strings } = useMessage();
 	const auth = useAuth();
 	const authRef = useRef(auth);
@@ -37,6 +41,39 @@ const NotaConstatareScreen = () => {
 			.replace(/[^a-zA-Z0-9]/g, '')
 			.toUpperCase();
 	};
+
+	const stripDiacritics = (value) => {
+		if (value === null || value === undefined) return value;
+		if (typeof value !== 'string') return value;
+		return value
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.replace(/ł/g, 'l')
+			.replace(/Ł/g, 'L');
+	};
+
+	const formatDaysToDueValue = useCallback((rawValue) => {
+		if (rawValue === '' || rawValue === null || rawValue === undefined) return '';
+
+		const rawString = String(rawValue).trim();
+		if (!rawString) return '';
+
+		const numericCandidate = rawString.replace(',', '.');
+		if (!/^-?\d+(\.\d+)?$/.test(numericCandidate)) {
+			return rawString;
+		}
+
+		const numericValue = Number(numericCandidate);
+		if (!Number.isFinite(numericValue)) return rawString;
+
+		if (numericValue <= 1) {
+			const roundedHours = numericValue > 0 ? Math.max(1, Math.round(numericValue * 24)) : 0;
+			return `${roundedHours} ore`;
+		}
+
+		const roundedDays = Math.max(1, Math.round(numericValue));
+		return `${roundedDays} zile`;
+	}, []);
 
 	useEffect(() => {
 		authRef.current = auth;
@@ -207,6 +244,15 @@ const NotaConstatareScreen = () => {
 							return;
 						}
 
+						if (key === 'days_to_due') {
+							const fromViolation = selectedViolation?.days_to_due;
+							if (fromViolation !== null && fromViolation !== undefined) {
+								initialValues[key] = formatDaysToDueValue(fromViolation);
+								initialLocked[key] = true;
+								return;
+							}
+						}
+
 						const hasPrefillFromViolation =
 							selectedViolation &&
 							Object.prototype.hasOwnProperty.call(selectedViolation, key) &&
@@ -221,12 +267,27 @@ const NotaConstatareScreen = () => {
 
 						if (req.type === 'BOOLEAN') {
 							initialValues[key] = false;
+						} else if (req.type === 'INT' && key === 'PUNCTE_PENALIZARE') {
+							initialValues[key] = 0;
 						} else if (req.type === 'TIMESTAMP' || req.type === 'ISO_STRING') {
 							initialValues[key] = new Date();
+						} else if (String(req.type || '').toUpperCase() === 'STRING') {
+							initialValues[key] = '';
 						} else {
 							initialValues[key] = '';
 						}
 					});
+
+					const hasAvertismentBoolean = response.data.some(
+						(req) => req?.type === 'BOOLEAN' && req?.value === 'AVERTISMENT'
+					);
+					const hasAmendaBoolean = response.data.some(
+						(req) => req?.type === 'BOOLEAN' && req?.value === 'AMENDA'
+					);
+					if (hasAvertismentBoolean && hasAmendaBoolean) {
+						initialValues.AVERTISMENT = true;
+						initialValues.AMENDA = false;
+					}
 					setFormValues(initialValues);
 					setLockedFields(initialLocked);
 					setLoadingRequirements(false);
@@ -241,7 +302,48 @@ const NotaConstatareScreen = () => {
 			setFormValues({});
 			setLockedFields({});
 		}
-	}, [selectedViolation, strings?.loadError]);
+	}, [selectedViolation, strings?.loadError, formatDaysToDueValue]);
+
+	const hasLocFaptaRequirement = useMemo(
+		() => requirements.some((req) => req?.value === 'LOC_FAPTA'),
+		[requirements]
+	);
+
+	useEffect(() => {
+		if (!selectedViolation?.id) return;
+		if (!hasLocFaptaRequirement) return;
+		if (Boolean(lockedFields?.LOC_FAPTA)) return;
+
+		const currentLoc = typeof formValues?.LOC_FAPTA === 'string' ? formValues.LOC_FAPTA.trim() : '';
+		if (currentLoc) return;
+
+		let cancelled = false;
+
+		(async () => {
+			try {
+				const { lat, long } = await getDeviceCoordinates();
+				if (cancelled) return;
+
+				const locationLabel = await getLocationLabelFromCoords(lat, long);
+				if (cancelled || !locationLabel) return;
+
+				setFormValues((prev) => {
+					const existing = typeof prev?.LOC_FAPTA === 'string' ? prev.LOC_FAPTA.trim() : '';
+					if (existing) return prev;
+					return {
+						...prev,
+						LOC_FAPTA: locationLabel,
+					};
+				});
+			} catch (error) {
+				console.log('LOC_FAPTA autofill skipped:', error?.message);
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedViolation?.id, hasLocFaptaRequirement, lockedFields?.LOC_FAPTA, formValues?.LOC_FAPTA, getDeviceCoordinates]);
 
 	const requiresPhoto = (() => {
 		const raw = selectedViolation?.requires_photo ?? selectedViolation?.requiresPhoto;
@@ -591,30 +693,46 @@ const NotaConstatareScreen = () => {
 			const key = req?.value;
 			if (!key) return;
 			let raw = formValues?.[key];
+			const reqType = String(req?.type || '').toUpperCase();
 
-			if (req?.type === 'TIMESTAMP') {
+			if (reqType === 'TIMESTAMP') {
 				if (raw instanceof Date) raw = Math.floor(raw.getTime() / 1000);
 				else if (typeof raw === 'number') raw = raw < 1e12 ? Math.floor(raw) : Math.floor(raw / 1000);
 			}
-			if (req?.type === 'ISO_STRING') {
+			if (reqType === 'ISO_STRING') {
 				if (raw instanceof Date) raw = raw.toISOString();
 			}
-			if (req?.type === 'INT') {
+			if (reqType === 'INT') {
 				if (raw === '' || raw === null || raw === undefined) raw = '';
 				else {
 					const n = parseInt(String(raw), 10);
 					raw = Number.isFinite(n) ? n : String(raw);
+					// For days_to_due: append unit and convert to hours when <= 1
+					if (key === 'days_to_due') {
+						raw = formatDaysToDueValue(raw);
+					}
 				}
 			}
-			if (req?.type === 'FLOAT') {
+			if (reqType === 'FLOAT') {
 				if (raw === '' || raw === null || raw === undefined) raw = '';
 				else {
 					const n = parseFloat(String(raw));
 					raw = Number.isFinite(n) ? n : String(raw);
 				}
 			}
-			if (req?.type === 'BOOLEAN') {
+			if (reqType === 'BOOLEAN') {
 				raw = Boolean(raw);
+			}
+
+			if (reqType === 'STRING' && key === 'days_to_due') {
+				raw = formatDaysToDueValue(raw);
+			}
+
+			if (reqType === 'STRING' && !STRING_MASK_EXCLUDED_KEYS.has(key)) {
+				const rawText = typeof raw === 'string' ? raw.trim() : '';
+				if (!rawText) {
+					raw = DEFAULT_STRING_MASK;
+				}
 			}
 
 			pairs.push([String(key), raw ?? '']);
@@ -630,12 +748,13 @@ const NotaConstatareScreen = () => {
 		upsertPreserveOrder('lat', lat ?? '');
 		upsertPreserveOrder('long', long ?? '');
 		upsertPreserveOrder('POZA_MASINA_BASE64', photoBwBase64 ?? '');
+		upsertPreserveOrder('preview', false);
 		if (plateID !== undefined && plateID !== null && String(plateID) !== '') {
 			upsertPreserveOrder('plateID', plateID);
 		}
 
 		return Object.fromEntries(pairs);
-	}, [formValues, requirements, selectedViolation?.code]);
+	}, [formValues, requirements, selectedViolation?.code, formatDaysToDueValue, DEFAULT_STRING_MASK, STRING_MASK_EXCLUDED_KEYS]);
 
 	const handleContinue = useCallback(async () => {
 		if (!selectedViolation?.id) return;
@@ -696,31 +815,247 @@ const NotaConstatareScreen = () => {
 
 	// Handle form value changes
 	const handleValueChange = (key, value) => {
-		setFormValues((prev) => ({
-			...prev,
-			[key]: value,
-		}));
+		setFormValues((prev) => {
+			const next = {
+				...prev,
+				[key]: stripDiacritics(value),
+			};
+
+			const hasAmenda = requirements.some((req) => req?.type === 'BOOLEAN' && req?.value === 'AMENDA');
+			const hasAvertisment = requirements.some((req) => req?.type === 'BOOLEAN' && req?.value === 'AVERTISMENT');
+
+			if (hasAmenda && hasAvertisment) {
+				if (key === 'AMENDA') next.AVERTISMENT = !Boolean(value);
+				if (key === 'AVERTISMENT') next.AMENDA = !Boolean(value);
+			}
+
+			if ((key === 'AMENDA' && !Boolean(value)) || (key === 'AVERTISMENT' && Boolean(value))) {
+				next.PUNCTE_AMENDA = 0;
+			}
+
+			return next;
+		});
 	};
+
+	const handleGroupedValueChange = (keys, value) => {
+		setFormValues((prev) => {
+			const next = { ...prev };
+			keys.forEach((groupKey) => {
+				next[groupKey] = value;
+			});
+			return next;
+		});
+	};
+
+	const displayRequirements = useMemo(() => {
+		const normalizeSuffixLabel = (suffix) =>
+			suffix
+				.split('_')
+				.filter(Boolean)
+				.map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+				.join(' ');
+
+		const timestampGroupMap = new Map();
+		requirements.forEach((req) => {
+			if (req.type !== 'TIMESTAMP' && req.type !== 'ISO_STRING') return;
+			const rawKey = String(req.value || '');
+			const splitIndex = rawKey.indexOf('_');
+			if (splitIndex < 0 || splitIndex === rawKey.length - 1) return;
+			const suffix = rawKey.slice(splitIndex + 1);
+			if (!timestampGroupMap.has(suffix)) {
+				timestampGroupMap.set(suffix, []);
+			}
+			timestampGroupMap.get(suffix).push(req);
+		});
+
+		const consumedKeys = new Set();
+		const result = [];
+
+		requirements.forEach((req) => {
+			const rawKey = String(req.value || '');
+			if (consumedKeys.has(rawKey)) return;
+
+			if (req.type === 'TIMESTAMP' || req.type === 'ISO_STRING') {
+				const splitIndex = rawKey.indexOf('_');
+				if (splitIndex >= 0 && splitIndex < rawKey.length - 1) {
+					const suffix = rawKey.slice(splitIndex + 1);
+					const group = timestampGroupMap.get(suffix) || [];
+					if (group.length > 1) {
+						group.forEach((item) => consumedKeys.add(String(item.value || '')));
+						result.push({
+							...group[0],
+							value: `__GROUP__${suffix}`,
+							label: `Data ${normalizeSuffixLabel(suffix)}`,
+							groupKeys: group.map((item) => String(item.value || '')),
+						});
+						return;
+					}
+				}
+			}
+
+			consumedKeys.add(rawKey);
+			result.push(req);
+		});
+
+		return result;
+	}, [requirements]);
+
+	const booleanKeys = useMemo(() => {
+		return requirements
+			.filter((req) => req?.type === 'BOOLEAN' && req?.value)
+			.map((req) => String(req.value))
+			.sort((a, b) => b.length - a.length);
+	}, [requirements]);
+
+	const getControllingBooleanKey = useCallback((fieldKey) => {
+		if (!fieldKey) return null;
+		const key = String(fieldKey);
+
+		for (const booleanKey of booleanKeys) {
+			if (key === booleanKey) continue;
+
+			if (key.endsWith(`_${booleanKey}`)) return booleanKey;
+			if (key.startsWith(`DESC_${booleanKey}`)) return booleanKey;
+			if (key.startsWith(`${booleanKey}_`)) return booleanKey;
+			if (key.includes(`_${booleanKey}_`)) return booleanKey;
+		}
+
+		return null;
+	}, [booleanKeys]);
+
+	const isFieldVisibleByBooleanRules = useCallback((fieldKey) => {
+		const controllerKey = getControllingBooleanKey(fieldKey);
+		if (!controllerKey) return true;
+		return Boolean(formValues?.[controllerKey]);
+	}, [formValues, getControllingBooleanKey]);
+
+	const visibleDisplayRequirements = useMemo(() => {
+		return displayRequirements.filter((req) => {
+			const groupKeys = Array.isArray(req?.groupKeys) ? req.groupKeys : [];
+			if (groupKeys.length > 0) {
+				return groupKeys.every((groupKey) => isFieldVisibleByBooleanRules(groupKey));
+			}
+
+			const key = String(req?.value || '');
+			return isFieldVisibleByBooleanRules(key);
+		});
+	}, [displayRequirements, isFieldVisibleByBooleanRules]);
+
+	const hasPuncteAmendaKey = useMemo(
+		() => requirements.some((req) => req?.value === 'PUNCTE_AMENDA' && req?.type === 'INT'),
+		[requirements]
+	);
+	const hasAmountKey = useMemo(
+		() => requirements.some((req) => req?.value === 'amount'),
+		[requirements]
+	);
+	const isAmountAutoControlled = hasPuncteAmendaKey && hasAmountKey;
+
+	const halfMinTargetKey = useMemo(() => {
+		if (requirements.some((req) => req?.value === 'half_min_amount')) return 'half_min_amount';
+		if (requirements.some((req) => req?.value === 'half_minimum')) return 'half_minimum';
+		return null;
+	}, [requirements]);
+	const hasMinFineAmountKey = useMemo(
+		() => requirements.some((req) => req?.value === 'min_fine_amount'),
+		[requirements]
+	);
+	const isHalfMinAutoControlled = Boolean(halfMinTargetKey && hasMinFineAmountKey);
+
+	useEffect(() => {
+		if (!isAmountAutoControlled) return;
+
+		setFormValues((prev) => {
+			const parseNumber = (raw) => {
+				const n = Number(raw);
+				return Number.isFinite(n) ? n : 0;
+			};
+
+			const finePointAmount = parseNumber(prev?.fine_point_amount);
+			const puncteAmenda = parseNumber(prev?.PUNCTE_AMENDA);
+			const amendaEnabled = prev?.AMENDA === undefined ? true : Boolean(prev?.AMENDA);
+
+			const computedAmount = amendaEnabled ? finePointAmount * puncteAmenda : 0;
+			if (prev?.amount === computedAmount) return prev;
+
+			return {
+				...prev,
+				amount: computedAmount,
+			};
+		});
+	}, [isAmountAutoControlled, formValues?.fine_point_amount, formValues?.PUNCTE_AMENDA, formValues?.AMENDA]);
+
+	useEffect(() => {
+		if (!isHalfMinAutoControlled || !halfMinTargetKey) return;
+
+		setFormValues((prev) => {
+			const parseNumber = (raw) => {
+				const n = Number(raw);
+				return Number.isFinite(n) ? n : 0;
+			};
+
+			const minFineAmount = parseNumber(prev?.min_fine_amount);
+			const computedHalfMin = minFineAmount / 2;
+
+			if (prev?.[halfMinTargetKey] === computedHalfMin) return prev;
+
+			return {
+				...prev,
+				[halfMinTargetKey]: computedHalfMin,
+			};
+		});
+	}, [isHalfMinAutoControlled, halfMinTargetKey, formValues?.min_fine_amount]);
+
+	useEffect(() => {
+		setFormValues((prev) => {
+			let changed = false;
+			const next = { ...prev };
+
+			requirements.forEach((req) => {
+				const key = req?.value;
+				if (!key) return;
+				if (req?.type === 'BOOLEAN') return;
+
+				const controllerKey = getControllingBooleanKey(key);
+				if (!controllerKey) return;
+				if (Boolean(prev?.[controllerKey])) return;
+
+					const clearedValue = key === 'PUNCTE_AMENDA' ? 0 : '';
+					if (next[key] !== clearedValue) {
+						next[key] = clearedValue;
+					changed = true;
+				}
+			});
+
+			return changed ? next : prev;
+		});
+	}, [requirements, getControllingBooleanKey, formValues]);
 
 	// Render input based on type
 	const renderInput = (requirement) => {
-		const { label, value: key, type } = requirement;
-		const isLocked = Boolean(lockedFields?.[key]);
+		const { label, value: rawKey, type, groupKeys } = requirement;
+		const isGroupedTimestamp = Array.isArray(groupKeys) && groupKeys.length > 1;
+		const key = isGroupedTimestamp ? groupKeys[0] : rawKey;
+		const isLocked = isGroupedTimestamp
+			? groupKeys.every((groupKey) => Boolean(lockedFields?.[groupKey]))
+			: Boolean(lockedFields?.[key]);
+		const isDaysToDueField = key === 'days_to_due';
 
 		switch (type) {
 			case 'STRING':
 					const isLicensePlate = key === 'license_plate';
+					const isStringReadOnly = isLocked || isDaysToDueField;
 				return (
 					<View key={key} style={styles.inputContainer}>
 						<CustomTextMedium style={styles.inputLabel}>{label}</CustomTextMedium>
 						<TextInput
-							style={[styles.textInput, isLocked && styles.textInputLocked]}
+							style={[styles.textInput, isStringReadOnly && styles.textInputLocked]}
 							value={formValues[key] || ''}
 								onChangeText={(text) => handleValueChange(key, isLicensePlate ? normalizeLicensePlate(text) : text)}
 							placeholder={label}
 							placeholderTextColor={gray}
-							editable={!isLocked}
-							selectTextOnFocus={!isLocked}
+							editable={!isStringReadOnly}
+							selectTextOnFocus={!isStringReadOnly}
 								autoCapitalize={isLicensePlate ? 'characters' : 'sentences'}
 								autoCorrect={!isLicensePlate}
 						/>
@@ -767,18 +1102,22 @@ const NotaConstatareScreen = () => {
 				);
 
 			case 'FLOAT':
+				const isAmountField = key === 'amount';
+				const isAmountReadOnly = isAmountField && isAmountAutoControlled;
+				const isHalfMinField = key === 'half_min_amount' || key === 'half_minimum';
+				const isHalfMinReadOnly = isHalfMinField && isHalfMinAutoControlled;
 				return (
 					<View key={key} style={styles.inputContainer}>
 						<CustomTextMedium style={styles.inputLabel}>{label}</CustomTextMedium>
 						<TextInput
-							style={[styles.textInput, isLocked && styles.textInputLocked]}
+							style={[styles.textInput, (isLocked || isAmountReadOnly || isHalfMinReadOnly) && styles.textInputLocked]}
 							value={formValues[key]?.toString() || ''}
 							onChangeText={(text) => handleValueChange(key, text.replace(/[^0-9.-]/g, ''))}
 							placeholder={label}
 							placeholderTextColor={gray}
 							keyboardType="decimal-pad"
-							editable={!isLocked}
-							selectTextOnFocus={!isLocked}
+							editable={!isLocked && !isAmountReadOnly && !isHalfMinReadOnly}
+							selectTextOnFocus={!isLocked && !isAmountReadOnly && !isHalfMinReadOnly}
 						/>
 					</View>
 				);
@@ -809,8 +1148,15 @@ const NotaConstatareScreen = () => {
 			case 'TIMESTAMP':
 			case 'ISO_STRING':
 				const currentDate = formValues[key] instanceof Date ? formValues[key] : new Date();
+				const setTimestampValue = (newDate) => {
+					if (isGroupedTimestamp) {
+						handleGroupedValueChange(groupKeys, newDate);
+						return;
+					}
+					handleValueChange(key, newDate);
+				};
 				return (
-					<View key={key} style={styles.inputContainer}>
+					<View key={String(rawKey)} style={styles.inputContainer}>
 						<CustomTextMedium style={styles.inputLabel}>{label}</CustomTextMedium>
 						<View style={styles.dateTimeContainer}>
 							<TouchableOpacity
@@ -850,7 +1196,7 @@ const NotaConstatareScreen = () => {
 										newDate.setFullYear(date.getFullYear());
 										newDate.setMonth(date.getMonth());
 										newDate.setDate(date.getDate());
-										handleValueChange(key, newDate);
+										setTimestampValue(newDate);
 									}
 								}}
 							/>
@@ -866,7 +1212,7 @@ const NotaConstatareScreen = () => {
 										const newDate = new Date(currentDate);
 										newDate.setHours(date.getHours());
 										newDate.setMinutes(date.getMinutes());
-										handleValueChange(key, newDate);
+										setTimestampValue(newDate);
 									}
 								}}
 							/>
@@ -1202,7 +1548,7 @@ const NotaConstatareScreen = () => {
 						</View>
 					) : (
 						<View style={styles.requirementsForm}>
-							{requirements.map((req) => renderInput(req))}
+							{visibleDisplayRequirements.map((req) => renderInput(req))}
 						</View>
 					)}
 				</View>
