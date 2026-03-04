@@ -401,6 +401,22 @@ const resolveRunStyle = ({ runStyle, pxPerDot, lineHeightPx }) => {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 const PrintPreviewScreen = () => {
 	const { PrintPreviewScreen: strings } = useMessage();
+	const decodeEscapedNewlines = useCallback((value) => String(value ?? '').replace(/\\n/g, '\n'), []);
+	const msg = useCallback(
+		(key, fallback) => decodeEscapedNewlines(strings?.[key] || fallback),
+		[decodeEscapedNewlines, strings],
+	);
+	const msgWith = useCallback(
+		(key, fallback, vars = {}) => {
+			const template = strings?.[key] || fallback;
+			const rendered = Object.entries(vars).reduce(
+				(acc, [k, v]) => acc.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v ?? '')),
+				String(template),
+			);
+			return decodeEscapedNewlines(rendered);
+		},
+		[decodeEscapedNewlines, strings],
+	);
 	const [data, setData] = useState(null);
 	const [isPrinting, setIsPrinting] = useState(false);
 	const [isReconnectingPrinter, setIsReconnectingPrinter] = useState(false);
@@ -466,7 +482,7 @@ const PrintPreviewScreen = () => {
 
 	const probeBleConnection = useCallback(async () => {
 		if (!BLEPrinter || !THERMAL_COMMANDS) {
-			throw new Error('Modulul de imprimantă nu este disponibil.');
+			throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
 		}
 		await BLEPrinter.printBill(
 			withPrinterCodeTable(
@@ -475,7 +491,7 @@ const PrintPreviewScreen = () => {
 			),
 			PRINTER_PRINT_OPTS,
 		);
-	}, []);
+	}, [msg]);
 
 	const connectToSavedPrinter = useCallback(
 		async ({ openPickerOnMissing = false } = {}) => {
@@ -484,41 +500,42 @@ const PrintPreviewScreen = () => {
 			}
 			isConnectingPrinterRef.current = true;
 
-			if (Platform.OS !== 'android') {
-				setPrinterConnectionStatus('disconnected');
-				setPrinterConnectionMessage('Conectarea BLE este disponibilă doar pe Android.');
-				isConnectingPrinterRef.current = false;
-				return { ok: false, reason: 'unsupported-platform' };
-			}
-
-			setPrinterConnectionStatus('checking');
-			setPrinterConnectionMessage('Se verifică conexiunea cu imprimanta...');
-
-			const okPermissions = await ensureAndroidBluetoothPermissions();
-			if (!okPermissions) {
-				setPrinterConnectionStatus('disconnected');
-				setPrinterConnectionMessage('Lipsesc permisiunile Bluetooth.');
-				isConnectingPrinterRef.current = false;
-				return { ok: false, reason: 'permissions' };
-			}
-
-			const [mac, name] = await Promise.all([
-				getValueAsync(STORAGE_KEYS.bleMac),
-				getValueAsync(STORAGE_KEYS.bleName),
-			]);
-
-			setSavedPrinterMac(mac || null);
-			setSavedPrinterName(name ? String(name) : '');
-
-			if (!mac) {
-				setPrinterConnectionStatus('disconnected');
-				setPrinterConnectionMessage('Nu există imprimantă salvată.');
-				if (openPickerOnMissing) setPrinterModalOpen(true);
-				isConnectingPrinterRef.current = false;
-				return { ok: false, reason: 'missing-saved-printer' };
-			}
-
 			try {
+				if (Platform.OS !== 'android') {
+					setPrinterConnectionStatus('disconnected');
+					setPrinterConnectionMessage(msg('bleAndroidOnly', 'BLE connection is available on Android only.'));
+					return { ok: false, reason: 'unsupported-platform' };
+				}
+
+				setPrinterConnectionStatus('checking');
+				setPrinterConnectionMessage(msg('checkingPrinterConnection', 'Checking printer connection...'));
+
+				const okPermissions = await ensureAndroidBluetoothPermissions();
+				if (!okPermissions) {
+					setPrinterConnectionStatus('disconnected');
+					setPrinterConnectionMessage(msg('bluetoothPermissionsMissing', 'Bluetooth permissions are missing.'));
+					return { ok: false, reason: 'permissions' };
+				}
+
+				const [mac, name] = await Promise.all([
+					getValueAsync(STORAGE_KEYS.bleMac),
+					getValueAsync(STORAGE_KEYS.bleName),
+				]);
+
+				setSavedPrinterMac(mac || null);
+				setSavedPrinterName(name ? String(name) : '');
+
+				if (!mac) {
+					setPrinterConnectionStatus('disconnected');
+					setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
+					if (openPickerOnMissing) setPrinterModalOpen(true);
+					return { ok: false, reason: 'missing-saved-printer' };
+				}
+
+				if (!BLEPrinter || typeof BLEPrinter.init !== 'function' || typeof BLEPrinter.getDeviceList !== 'function') {
+					throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
+				}
+
 				await resetBleConnection();
 				await BLEPrinter.init();
 				const list = await BLEPrinter.getDeviceList();
@@ -526,91 +543,114 @@ const PrintPreviewScreen = () => {
 
 				if (!hit) {
 					setPrinterConnectionStatus('disconnected');
-					setPrinterConnectionMessage('Imprimanta salvată nu este disponibilă acum.');
+					setPrinterConnectionMessage(msg('savedPrinterUnavailable', 'Saved printer is currently unavailable.'));
 					setBleDevices(Array.isArray(list) ? list : []);
 					if (openPickerOnMissing) setPrinterModalOpen(true);
 					return { ok: false, reason: 'device-not-found' };
 				}
 
 				const deviceMac = String(getDeviceMac(hit));
+				if (!deviceMac) {
+					throw new Error(msg('invalidDeviceMissingAddress', 'Invalid device (missing address).'));
+				}
+				if (typeof BLEPrinter.connectPrinter !== 'function') {
+					throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
+				}
 				await BLEPrinter.connectPrinter(deviceMac);
 				await probeBleConnection();
 
-				const nextName = String(hit?.device_name || hit?.name || name || 'Imprimantă');
+				const nextName = String(hit?.device_name || hit?.name || name || msg('printerDefaultName', 'Printer'));
 				setSavedPrinterMac(deviceMac);
 				setSavedPrinterName(nextName);
 				await setValueAsync(STORAGE_KEYS.bleMac, deviceMac);
 				if (nextName) await setValueAsync(STORAGE_KEYS.bleName, nextName);
 
 				setPrinterConnectionStatus('connected');
-				setPrinterConnectionMessage(`Conectat: ${nextName}`);
+				setPrinterConnectionMessage(
+					msgWith('connectedToPrinter', 'Connected: {{name}}', { name: nextName }),
+				);
 				return { ok: true, device: hit, mac: deviceMac, name: nextName };
 			} catch (e) {
 				console.warn('[print-preview] connect saved printer error', e);
 				setPrinterConnectionStatus('disconnected');
-				setPrinterConnectionMessage(`Conexiune invalidă: ${String(e?.message || e)}`);
+				setPrinterConnectionMessage(
+					msgWith('invalidConnection', 'Invalid connection: {{error}}', { error: String(e?.message || e) }),
+				);
 				return { ok: false, reason: 'connect-failed', error: e };
 			} finally {
 				isConnectingPrinterRef.current = false;
 			}
 		},
-		[probeBleConnection, resetBleConnection],
+		[msg, msgWith, probeBleConnection, resetBleConnection],
 	);
 
 	useEffect(() => {
 		if (Platform.OS !== 'android') return;
+		let cancelled = false;
 
 		const run = async () => {
-			const savedMac = await getValueAsync(STORAGE_KEYS.bleMac);
-			const savedName = await getValueAsync(STORAGE_KEYS.bleName);
-			setSavedPrinterMac(savedMac || null);
-			setSavedPrinterName(savedName ? String(savedName) : '');
-			if (savedMac) {
-				await connectToSavedPrinter({ openPickerOnMissing: false });
-			} else {
+			try {
+				const savedMac = await getValueAsync(STORAGE_KEYS.bleMac);
+				const savedName = await getValueAsync(STORAGE_KEYS.bleName);
+				if (cancelled) return;
+				setSavedPrinterMac(savedMac || null);
+				setSavedPrinterName(savedName ? String(savedName) : '');
 				setPrinterConnectionStatus('disconnected');
-				setPrinterConnectionMessage('Nu există imprimantă salvată.');
+				setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
+			} catch (e) {
+				if (cancelled) return;
+				console.warn('[print-preview] restore saved printer state error', e);
+				setPrinterConnectionStatus('disconnected');
+				setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
 			}
 		};
 
 		run();
-	}, [connectToSavedPrinter]);
+		return () => {
+			cancelled = true;
+		};
+	}, [connectToSavedPrinter, msg]);
 
 	const onPressReconnectPrinter = useCallback(async () => {
 		if (isPrinting) return;
 		setIsReconnectingPrinter(true);
 		const result = await connectToSavedPrinter({ openPickerOnMissing: true });
 		if (result?.ok) {
-			Alert.alert('Imprimantă', 'Conexiunea cu imprimanta a fost refăcută.');
+			Alert.alert(
+				msg('printerReconnectedTitle', 'Printer'),
+				msg('printerReconnectedMessage', 'Printer connection has been restored.'),
+			);
 		}
 		setIsReconnectingPrinter(false);
-	}, [connectToSavedPrinter, isPrinting]);
+	}, [connectToSavedPrinter, isPrinting, msg]);
 
 	const printerStatusText = useMemo(() => {
 		if (printerConnectionStatus === 'connected') {
-			return printerConnectionMessage || 'Telefon conectat la imprimantă.';
+			return printerConnectionMessage || msg('phoneConnectedToPrinter', 'Phone connected to printer.');
 		}
 		if (printerConnectionStatus === 'checking') {
-			return printerConnectionMessage || 'Se verifică conexiunea...';
+			return printerConnectionMessage || msg('checkingConnection', 'Checking connection...');
 		}
 		if (savedPrinterMac) {
 			const printerName = savedPrinterName ? ` (${savedPrinterName})` : '';
-			return `Telefon neconectat la imprimantă${printerName}.`;
+			return msgWith('phoneDisconnectedToPrinter', 'Phone not connected to printer{{nameSuffix}}.', {
+				nameSuffix: printerName,
+			});
 		}
-		return printerConnectionMessage || 'Nu există imprimantă salvată.';
-	}, [printerConnectionMessage, printerConnectionStatus, savedPrinterMac, savedPrinterName]);
+		return printerConnectionMessage || msg('noSavedPrinter', 'No saved printer.');
+	}, [msg, msgWith, printerConnectionMessage, printerConnectionStatus, savedPrinterMac, savedPrinterName]);
 
 	const onPressPrint = useCallback(() => {
 		const run = async () => {
 			if (Platform.OS === 'web') {
-				Alert.alert('Tipărire', 'Tipărirea prin Bluetooth nu este disponibilă pe Web.');
+				Alert.alert(msg('printTitle', 'Print'), msg('printBluetoothUnavailableWeb', 'Bluetooth printing is not available on Web.'));
 				return;
 			}
 			if (Platform.OS === 'ios') {
 				Alert.alert(
-					'⚠️ Tipărire indisponibilă pe iOS',
-					'Imprimanta Datecs DPP-450 folosește Bluetooth Classic (SPP), care nu este permis pentru aplicații terțe pe iOS din cauza restricțiilor Apple (MFi Program).\n\nPoți tipări nota de constatare de pe un dispozitiv Android.',
-					[{ text: 'Am înțeles', style: 'cancel' }],
+					msg('printUnavailableIOS', '⚠️ Printing unavailable on iOS'),
+					msg('printUnavailableIOSBody', 'Datecs DPP-450 uses Bluetooth Classic (SPP), which is not allowed for third-party apps on iOS due to Apple restrictions (MFi Program).\n\nYou can print the inspection note from an Android device.'),
+					[{ text: msg('understood', 'Understood'), style: 'cancel' }],
 					{ cancelable: true },
 				);
 				return;
@@ -621,8 +661,8 @@ const PrintPreviewScreen = () => {
 				const ok = await ensureAndroidBluetoothPermissions();
 				if (!ok) {
 					Alert.alert(
-						'Permisiuni Bluetooth',
-						'Aplicația are nevoie de permisiunea BLUETOOTH_CONNECT (și scan) ca să se conecteze la imprimantă. Te rog acceptă permisiunile și încearcă din nou.',
+						msg('bluetoothPermissionsTitle', 'Bluetooth permissions'),
+						msg('bluetoothPermissionsMessage', 'The app needs BLUETOOTH_CONNECT (and scan) permission to connect to the printer. Please accept permissions and try again.'),
 					);
 					return;
 				}
@@ -632,7 +672,7 @@ const PrintPreviewScreen = () => {
 			try {
 				const COMMANDS = THERMAL_COMMANDS;
 				if (!BLEPrinter || !COMMANDS) {
-					Alert.alert('Tipărire', 'Modulul de imprimantă nu este disponibil.');
+					Alert.alert(msg('printTitle', 'Print'), msg('printerModuleUnavailable', 'Printer module is not available.'));
 					return;
 				}
 
@@ -649,7 +689,7 @@ const PrintPreviewScreen = () => {
 				if (!connection?.ok) {
 					if (connection?.reason === 'device-not-found') {
 						setBleError(
-							'Imprimanta salvată nu a fost găsită prin BLE scan. Dacă Datecs DPP-450 este Bluetooth clasic (SPP), nu va apărea aici.',
+							msg('savedPrinterNotFoundByBle', 'Saved printer was not found in BLE scan. If Datecs DPP-450 is Bluetooth Classic (SPP), it will not appear here.'),
 						);
 					}
 					return;
@@ -680,7 +720,7 @@ const PrintPreviewScreen = () => {
 						if (!base64) continue;
 						if (base64.includes('{{')) {
 							// Preview can show placeholders; printing cannot.
-							throw new Error('Imagine lipsă (placeholder) în template.');
+							throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
 						}
 
 						// IMPORTANT (Android native module behavior): if we only pass `imageWidth`,
@@ -711,17 +751,19 @@ const PrintPreviewScreen = () => {
 					PRINTER_PRINT_OPTS,
 				);
 				Alert.alert(
-					'✅ Notă de constatare trimisă',
-					'Nota de constatare a fost trimisă către imprimantă.\n\nDacă tipărirea nu s-a realizat corect sau au apărut probleme (hârtie blocată, conexiune întreruptă etc.), poți relua tipărirea apăsând din nou butonul de print.',
-					[{ text: 'OK', style: 'default' }],
+					msg('printSentTitle', '✅ Inspection note sent'),
+					msg('printSentMessage', 'The inspection note was sent to the printer.\n\nIf printing failed or issues occurred (paper jam, lost connection, etc.), you can retry by pressing the print button again.'),
+					[{ text: msg('ok', 'OK'), style: 'default' }],
 				);
 			} catch (e) {
 				console.warn('[print-preview] print error', e);
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
 				Alert.alert(
-					'Tipărire',
-					`Eroare la tipărire: ${String(e?.message || e)}\n\nDacă imprimanta este Bluetooth clasic (SPP), lista BLE nu o va vedea.`,
+					msg('printTitle', 'Print'),
+					msgWith('printErrorMessage', 'Print error: {{error}}\n\nIf the printer is Bluetooth Classic (SPP), BLE scan will not detect it.', {
+						error: String(e?.message || e),
+					}),
 				);
 			}
 			finally {
@@ -730,7 +772,7 @@ const PrintPreviewScreen = () => {
 		};
 
 		run();
-	}, [connectToSavedPrinter, data?.printed_nota, maxDots, printTemplate]);
+	}, [connectToSavedPrinter, data?.printed_nota, maxDots, msg, msgWith, printTemplate]);
 
 	const onRefreshBleDevices = useCallback(async () => {
 		setBleError(null);
@@ -757,7 +799,10 @@ const PrintPreviewScreen = () => {
 			const mac = getDeviceMac(device);
 			const name = device?.device_name || device?.name || '';
 			if (!mac) {
-				Alert.alert('Imprimantă', 'Dispozitiv invalid (lipsește adresa).');
+				Alert.alert(
+					msg('printerReconnectedTitle', 'Printer'),
+					msg('invalidDeviceMissingAddress', 'Invalid device (missing address).'),
+				);
 				return;
 			}
 
@@ -776,12 +821,16 @@ const PrintPreviewScreen = () => {
 				await setValueAsync(STORAGE_KEYS.bleMac, String(mac));
 				if (name) await setValueAsync(STORAGE_KEYS.bleName, String(name));
 				setSavedPrinterMac(String(mac));
-				setSavedPrinterName(String(name || 'Imprimantă'));
+				setSavedPrinterName(String(name || msg('printerDefaultName', 'Printer')));
 				const COMMANDS = THERMAL_COMMANDS;
 				await BLEPrinter.init();
 				await BLEPrinter.connectPrinter(String(mac));
 				setPrinterConnectionStatus('connected');
-				setPrinterConnectionMessage(`Conectat: ${String(name || 'Imprimantă')}`);
+				setPrinterConnectionMessage(
+					msgWith('connectedToPrinter', 'Connected: {{name}}', {
+						name: String(name || msg('printerDefaultName', 'Printer')),
+					}),
+				);
 
 				const jobs = buildThermalPrintJobsFromWrappedTemplate({
 					wrappedTemplate: printTemplate,
@@ -801,7 +850,7 @@ const PrintPreviewScreen = () => {
 					} else if (job.type === 'imageBase64') {
 						const base64 = String(job.base64 || '').trim();
 						if (!base64) continue;
-						if (base64.includes('{{')) throw new Error('Imagine lipsă (placeholder) în template.');
+						if (base64.includes('{{')) throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
 						const requestedW = clampInt(Number(job.imageWidth) || 0, 1, 5000);
 						const maxW = maxDots ? Math.min(requestedW, maxDots) : requestedW;
 						const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
@@ -824,20 +873,20 @@ const PrintPreviewScreen = () => {
 					PRINTER_PRINT_OPTS,
 				);
 				Alert.alert(
-					'✅ Notă de constatare trimisă',
-					'Nota de constatare a fost trimisă către imprimantă.\n\nDacă tipărirea nu s-a realizat corect sau au apărut probleme (hârtie blocată, conexiune întreruptă etc.), poți relua tipărirea apăsând din nou butonul de print.',
-					[{ text: 'OK', style: 'default' }],
+					msg('printSentTitle', '✅ Inspection note sent'),
+					msg('printSentMessage', 'The inspection note was sent to the printer.\n\nIf printing failed or issues occurred (paper jam, lost connection, etc.), you can retry by pressing the print button again.'),
+					[{ text: msg('ok', 'OK'), style: 'default' }],
 				);
 			} catch (e) {
 				console.warn('[print-preview] pick+print error', e);
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
-				Alert.alert('Tipărire', `Eroare: ${String(e?.message || e)}`);
+				Alert.alert(msg('printTitle', 'Print'), `Error: ${String(e?.message || e)}`);
 			} finally {
 				setIsPrinting(false);
 			}
 		},
-		[maxDots, printTemplate],
+		[maxDots, msg, msgWith, printTemplate],
 	);
 
 	if (!data) {
@@ -873,14 +922,14 @@ const PrintPreviewScreen = () => {
 				<View style={styles.modalBackdrop}>
 					<View style={styles.modalCard}>
 						<View style={styles.modalHeader}>
-							<CustomTextBold style={styles.modalTitle}>Selectează imprimanta (BLE)</CustomTextBold>
+							<CustomTextBold style={styles.modalTitle}>{msg('selectPrinterBle', 'Select printer (BLE)')}</CustomTextBold>
 							<Pressable onPress={() => setPrinterModalOpen(false)} hitSlop={10}>
 								<Text style={styles.modalClose}>✕</Text>
 							</Pressable>
 						</View>
 
 						<Text style={styles.modalHint}>
-							Dacă imprimanta ta e Bluetooth clasic (SPP) (ex: multe Datecs DPP), nu va apărea aici.
+							{msg('classicBluetoothHint', 'If your printer is Bluetooth Classic (SPP) (e.g. many Datecs DPP models), it will not appear here.')}
 						</Text>
 						{bleError ? <Text style={styles.modalError}>{bleError}</Text> : null}
 
@@ -890,17 +939,20 @@ const PrintPreviewScreen = () => {
 								style={({ pressed }) => [styles.modalButton, pressed && styles.modalButtonPressed]}
 								disabled={bleLoading}
 							>
-								<Text style={styles.modalButtonText}>{bleLoading ? 'Se caută...' : 'Reîncarcă lista'}</Text>
+								<Text style={styles.modalButtonText}>{bleLoading ? msg('searching', 'Searching...') : msg('reloadList', 'Reload list')}</Text>
 							</Pressable>
 							<Pressable
 								onPress={async () => {
 									await removeValueAsync(STORAGE_KEYS.bleMac);
 									await removeValueAsync(STORAGE_KEYS.bleName);
-									Alert.alert('Imprimantă', 'Imprimanta salvată a fost ștearsă.');
+									Alert.alert(
+										msg('printerReconnectedTitle', 'Printer'),
+										msg('savedPrinterDeleted', 'Saved printer was removed.'),
+									);
 								}}
 								style={({ pressed }) => [styles.modalButtonSecondary, pressed && styles.modalButtonPressed]}
 							>
-								<Text style={styles.modalButtonSecondaryText}>Șterge imprimanta salvată</Text>
+								<Text style={styles.modalButtonSecondaryText}>{msg('deleteSavedPrinter', 'Delete saved printer')}</Text>
 							</Pressable>
 						</View>
 
@@ -910,7 +962,7 @@ const PrintPreviewScreen = () => {
 								String(item?.inner_mac_address || item?.macAddress || item?.mac || item?.address || idx)
 							}
 							renderItem={({ item }) => {
-								const name = item?.device_name || item?.name || 'Printer';
+								const name = item?.device_name || item?.name || msg('printerDefaultName', 'Printer');
 								const mac = item?.inner_mac_address || item?.macAddress || item?.mac || item?.address;
 								return (
 									<Pressable
@@ -924,7 +976,7 @@ const PrintPreviewScreen = () => {
 								);
 							}}
 							ListEmptyComponent={
-								bleLoading ? null : <Text style={styles.modalEmpty}>Nu au fost găsite imprimante BLE.</Text>
+								bleLoading ? null : <Text style={styles.modalEmpty}>{msg('noBlePrintersFound', 'No BLE printers found.')}</Text>
 							}
 							contentContainerStyle={{ paddingBottom: 10 }}
 						/>
@@ -939,10 +991,10 @@ const PrintPreviewScreen = () => {
 			>
 				<View style={styles.meta}>
 					<Text style={styles.metaText} allowFontScaling={false}>
-						{`Preview 1:1 by dots  ·  wrap dots: ${maxDots}`}
+						{`${msg('previewByDots', 'Preview 1:1 by dots')}  ·  ${msg('wrapDots', 'wrap dots')}: ${maxDots}`}
 					</Text>
 					<Text style={styles.metaText} allowFontScaling={false}>
-						{`dots: ${maxDots}  ·  content: ${Math.round(contentWidthPx)}px  ·  ${pxPerDot ? pxPerDot.toFixed(3) : '0.000'} px/dot`}
+						{`${msg('dotsLabel', 'dots')}: ${maxDots}  ·  ${msg('contentLabel', 'content')}: ${Math.round(contentWidthPx)}px  ·  ${pxPerDot ? pxPerDot.toFixed(3) : '0.000'} ${msg('pxPerDotLabel', 'px/dot')}`}
 					</Text>
 				</View>
 
@@ -1048,7 +1100,7 @@ const PrintPreviewScreen = () => {
 						{isReconnectingPrinter ? (
 							<ActivityIndicator size="small" color={purple} />
 						) : (
-							<CustomTextBold style={styles.reconnectButtonText}>Reconectează</CustomTextBold>
+							<CustomTextBold style={styles.reconnectButtonText}>{msg('reconnect', 'Reconnect')}</CustomTextBold>
 						)}
 					</Pressable>
 				<Pressable
@@ -1065,7 +1117,7 @@ const PrintPreviewScreen = () => {
 						<ActivityIndicator size="small" color={white} />
 					) : (
 						<CustomTextBold style={styles.printButtonText}>
-							{strings?.print || 'Tipărește'}
+							{strings?.print || 'Print'}
 						</CustomTextBold>
 					)}
 				</Pressable>

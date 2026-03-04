@@ -66,14 +66,17 @@ const NotaConstatareScreen = () => {
 		const numericValue = Number(numericCandidate);
 		if (!Number.isFinite(numericValue)) return rawString;
 
+		const hoursLabel = strings?.unitHours || 'hours';
+		const daysLabel = strings?.unitDays || 'days';
+
 		if (numericValue <= 1) {
 			const roundedHours = numericValue > 0 ? Math.max(1, Math.round(numericValue * 24)) : 0;
-			return `${roundedHours} ore`;
+			return `${roundedHours} ${hoursLabel}`;
 		}
 
 		const roundedDays = Math.max(1, Math.round(numericValue));
-		return `${roundedDays} zile`;
-	}, []);
+		return `${roundedDays} ${daysLabel}`;
+	}, [strings?.unitDays, strings?.unitHours]);
 
 	useEffect(() => {
 		authRef.current = auth;
@@ -760,7 +763,7 @@ const NotaConstatareScreen = () => {
 		if (!selectedViolation?.id) return;
 		if (submitting) return;
 		if (requiresPhoto && photoLoading) {
-			Alert.alert(strings?.error || 'Error', 'Se procesează poza pentru print. Te rog așteaptă o secundă.');
+			Alert.alert(strings?.error || 'Error', strings?.processingPhoto || 'Photo is still being processed for print. Please wait a second.');
 			return;
 		}
 		if (requiresPhoto && !photoBase64) {
@@ -1072,9 +1075,9 @@ const NotaConstatareScreen = () => {
 					if (Number.isFinite(days)) {
 						if (isLocked && days <= 1) {
 							displayIntValue = String(Math.round(days * 24));
-							unitText = 'ore';
+							unitText = strings?.unitHours || 'hours';
 						} else {
-							unitText = 'zile';
+							unitText = strings?.unitDays || 'days';
 						}
 					}
 				}
@@ -1398,7 +1401,7 @@ const NotaConstatareScreen = () => {
 											<View style={styles.optionMetaItem}>
 												<MaterialIcons name="schedule" size={resize(12)} color={gray} />
 												<CustomTextRegular style={styles.optionMetaText}>
-													{code.days_to_due} zile
+													{code.days_to_due} {strings?.unitDays || 'days'}
 												</CustomTextRegular>
 											</View>
 										</View>
