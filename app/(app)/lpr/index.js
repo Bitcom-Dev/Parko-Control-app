@@ -35,7 +35,7 @@ import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 const LIMIT = 10;
 
 // ─── PlateCard ────────────────────────────────────────────────────────────────
-const PlateCard = ({ item, strings, onInspectionNote }) => {
+const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLeftLoading = false }) => {
 	const [thumbnailData, setThumbnailData] = useState(null);
 	const [fullImageData, setFullImageData] = useState(null);
 	const [imageError, setImageError] = useState(false);
@@ -115,7 +115,10 @@ const PlateCard = ({ item, strings, onInspectionNote }) => {
 	};
 
 	const handleVehicleLeft = () => {
-		// TODO: integrate with backend action
+		if (typeof onVehicleLeft === 'function') {
+			onVehicleLeft(item);
+			return;
+		}
 		console.log('Vehicul plecat:', item?.ID);
 	};
 
@@ -375,6 +378,7 @@ const PlateCard = ({ item, strings, onInspectionNote }) => {
 
 						<TouchableOpacity
 							onPress={handleVehicleLeft}
+							disabled={isVehicleLeftLoading}
 							style={{
 								flex: 1,
 								flexDirection: 'row',
@@ -386,9 +390,14 @@ const PlateCard = ({ item, strings, onInspectionNote }) => {
 								backgroundColor: lightOrange,
 								borderWidth: 1,
 								borderColor: 'rgba(243, 135, 19, 0.3)',
+								opacity: isVehicleLeftLoading ? 0.7 : 1,
 							}}
 						>
-							<Feather name="log-out" size={resize(15)} color={orange} />
+							{isVehicleLeftLoading ? (
+								<ActivityIndicator size="small" color={orange} />
+							) : (
+								<Feather name="log-out" size={resize(15)} color={orange} />
+							)}
 							<CustomTextMedium style={{ ...general.fontSize9, color: orange }}>
 								{strings?.vehicleLeft}
 							</CustomTextMedium>
@@ -475,6 +484,7 @@ const LPRScreen = () => {
 	const [showFilters, setShowFilters] = useState(false);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [refreshing, setRefreshing] = useState(false);
+	const [vehicleLeftLoadingId, setVehicleLeftLoadingId] = useState(null);
 	const hasInitialized = useRef(false);
 	const flatListRef = useRef(null);
 
@@ -574,6 +584,44 @@ const LPRScreen = () => {
 				});
 		},
 		[auth, strings, latitude, longitude]
+	);
+
+	const handleVehicleLeft = useCallback(
+		(plateItem) => {
+			if (!plateItem?.ID) return;
+			setVehicleLeftLoadingId(plateItem.ID);
+			setErrorMessage('');
+
+			lprInstance(auth)
+				.post('/plate/left_crime_scene', { plateID: plateItem.ID })
+				.then(() => {
+					setPlates((currentPlates) =>
+						currentPlates.filter((currentPlate) => currentPlate?.ID !== plateItem.ID)
+					);
+					setTotal((currentTotal) => Math.max(0, currentTotal - 1));
+
+					if (page === 1) {
+						fetchPlates(1);
+					} else {
+						setPage(1);
+					}
+				})
+				.catch((error) => {
+					if (error.response?.status === 403) {
+						setErrorMessage(strings?.forbidden);
+					} else if (error.message === 'Network Error') {
+						setErrorMessage(strings?.networkError);
+					} else {
+						setErrorMessage(strings?.loadError);
+					}
+				})
+				.finally(() => {
+					setVehicleLeftLoadingId((currentId) =>
+						currentId === plateItem.ID ? null : currentId
+					);
+				});
+		},
+		[auth, fetchPlates, page, strings]
 	);
 
 	useEffect(() => {
@@ -991,7 +1039,13 @@ const LPRScreen = () => {
 						ref={flatListRef}
 						data={plates}
 						renderItem={({ item }) => (
-							<PlateCard item={item} strings={strings} onInspectionNote={handleInspectionNote} />
+							<PlateCard
+								item={item}
+								strings={strings}
+								onInspectionNote={handleInspectionNote}
+								onVehicleLeft={handleVehicleLeft}
+								isVehicleLeftLoading={vehicleLeftLoadingId === item?.ID}
+							/>
 						)}
 						keyExtractor={(item) =>
 							item.ID != null ? item.ID.toString() : Math.random().toString()
