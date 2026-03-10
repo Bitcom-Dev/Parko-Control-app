@@ -52,6 +52,29 @@ const NotaConstatareScreen = () => {
 			.replace(/Ł/g, 'L');
 	};
 
+	const getViolationValueForRequirement = useCallback((violation, requirementKey, usePjVariant = false) => {
+		if (!violation || !requirementKey) return undefined;
+
+		const keyMap = {
+			amount: 'default_fine_amount',
+			min_fine_amount: 'min_fine_amount',
+			max_fine_amount: 'max_fine_amount',
+			fine_point_amount: 'fine_point_amount',
+		};
+
+		const baseKey = keyMap[String(requirementKey)] || String(requirementKey);
+
+		if (usePjVariant) {
+			const pjKey = `${baseKey}_pj`;
+			const pjValue = violation?.[pjKey];
+			if (pjValue !== null && pjValue !== undefined) {
+				return pjValue;
+			}
+		}
+
+		return violation?.[baseKey];
+	}, []);
+
 	const formatDaysToDueValue = useCallback((rawValue) => {
 		if (rawValue === '' || rawValue === null || rawValue === undefined) return '';
 
@@ -153,6 +176,7 @@ const NotaConstatareScreen = () => {
 				// Filter only active violation codes
 				const activeCodes = response.data.filter((code) => code.is_active);
 				setViolationCodes(activeCodes);
+				console.log('Fetched violation codes:', activeCodes);
 
 				const preset = presetRef.current;
 				if (preset?.enabled && !selectedViolation) {
@@ -195,6 +219,10 @@ const NotaConstatareScreen = () => {
 					// Initialize form values; prefill + lock when requirement.value exists in selectedViolation
 					const initialValues = {};
 					const initialLocked = {};
+					const hasPjBooleanRequirement = response.data.some(
+						(req) => req?.type === 'BOOLEAN' && req?.value === 'PJ'
+					);
+					const initialPjEnabled = hasPjBooleanRequirement && Boolean(selectedViolation?.PJ);
 
 					const licensePlatePrefill =
 						params?.license_plate ||
@@ -227,6 +255,11 @@ const NotaConstatareScreen = () => {
 
 					response.data.forEach((req) => {
 						const key = req.value;
+						const mappedViolationValue = getViolationValueForRequirement(
+							selectedViolation,
+							key,
+							initialPjEnabled
+						);
 
 						// Special rules
 						if (key === 'ts') {
@@ -241,8 +274,8 @@ const NotaConstatareScreen = () => {
 							return;
 						}
 
-						if (key === 'amount' && selectedViolation?.default_fine_amount !== null && selectedViolation?.default_fine_amount !== undefined) {
-							initialValues[key] = coercePrefillValue(req.type, selectedViolation.default_fine_amount);
+						if (key === 'amount' && mappedViolationValue !== null && mappedViolationValue !== undefined) {
+							initialValues[key] = coercePrefillValue(req.type, mappedViolationValue);
 							// editable on purpose
 							return;
 						}
@@ -256,14 +289,8 @@ const NotaConstatareScreen = () => {
 							}
 						}
 
-						const hasPrefillFromViolation =
-							selectedViolation &&
-							Object.prototype.hasOwnProperty.call(selectedViolation, key) &&
-							selectedViolation[key] !== null &&
-							selectedViolation[key] !== undefined;
-
-						if (hasPrefillFromViolation) {
-							initialValues[key] = coercePrefillValue(req.type, selectedViolation[key]);
+						if (mappedViolationValue !== null && mappedViolationValue !== undefined) {
+							initialValues[key] = coercePrefillValue(req.type, mappedViolationValue);
 							initialLocked[key] = true;
 							return;
 						}
@@ -305,7 +332,7 @@ const NotaConstatareScreen = () => {
 			setFormValues({});
 			setLockedFields({});
 		}
-	}, [selectedViolation, strings?.loadError, formatDaysToDueValue]);
+	}, [selectedViolation, strings?.loadError, formatDaysToDueValue, getViolationValueForRequirement]);
 
 	const hasLocFaptaRequirement = useMemo(
 		() => requirements.some((req) => req?.value === 'LOC_FAPTA'),
@@ -944,6 +971,11 @@ const NotaConstatareScreen = () => {
 		});
 	}, [displayRequirements, isFieldVisibleByBooleanRules]);
 
+	const isPjEnabled = useMemo(() => {
+		const hasPjRequirement = requirements.some((req) => req?.type === 'BOOLEAN' && req?.value === 'PJ');
+		return hasPjRequirement && Boolean(formValues?.PJ);
+	}, [requirements, formValues?.PJ]);
+
 	const hasPuncteAmendaKey = useMemo(
 		() => requirements.some((req) => req?.value === 'PUNCTE_AMENDA' && req?.type === 'INT'),
 		[requirements]
@@ -953,6 +985,16 @@ const NotaConstatareScreen = () => {
 		[requirements]
 	);
 	const isAmountAutoControlled = hasPuncteAmendaKey && hasAmountKey;
+	const pjSensitiveRequirementKeys = useMemo(() => {
+		const keys = [];
+
+		if (!isAmountAutoControlled && hasAmountKey) keys.push('amount');
+		if (requirements.some((req) => req?.value === 'min_fine_amount')) keys.push('min_fine_amount');
+		if (requirements.some((req) => req?.value === 'max_fine_amount')) keys.push('max_fine_amount');
+		if (requirements.some((req) => req?.value === 'fine_point_amount')) keys.push('fine_point_amount');
+
+		return keys;
+	}, [requirements, isAmountAutoControlled, hasAmountKey]);
 
 	const halfMinTargetKey = useMemo(() => {
 		if (requirements.some((req) => req?.value === 'half_min_amount')) return 'half_min_amount';
@@ -964,6 +1006,28 @@ const NotaConstatareScreen = () => {
 		[requirements]
 	);
 	const isHalfMinAutoControlled = Boolean(halfMinTargetKey && hasMinFineAmountKey);
+
+	useEffect(() => {
+		if (!selectedViolation?.id) return;
+		if (pjSensitiveRequirementKeys.length === 0) return;
+
+		setFormValues((prev) => {
+			let changed = false;
+			const next = { ...prev };
+
+			pjSensitiveRequirementKeys.forEach((key) => {
+				const violationValue = getViolationValueForRequirement(selectedViolation, key, isPjEnabled);
+				if (violationValue === null || violationValue === undefined) return;
+
+				if (next[key] !== violationValue) {
+					next[key] = violationValue;
+					changed = true;
+				}
+			});
+
+			return changed ? next : prev;
+		});
+	}, [selectedViolation, pjSensitiveRequirementKeys, isPjEnabled, getViolationValueForRequirement]);
 
 	useEffect(() => {
 		if (!isAmountAutoControlled) return;
@@ -1395,7 +1459,7 @@ const NotaConstatareScreen = () => {
 											<View style={styles.optionMetaItem}>
 												<MaterialIcons name="euro" size={resize(12)} color={orange} />
 												<CustomTextRegular style={styles.optionMetaText}>
-													{code.default_fine_amount} RON
+														{getViolationValueForRequirement(code, 'amount', isPjEnabled)} RON
 												</CustomTextRegular>
 											</View>
 											<View style={styles.optionMetaItem}>
