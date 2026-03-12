@@ -1,5 +1,6 @@
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { useMemo } from 'react';
+import Constants from 'expo-constants';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { resize, general } from '../../../util/style';
 import { black, gray, lightGray, lightOrange, orange, purple, white } from '../../../util/colors';
@@ -142,6 +143,23 @@ const IndexSettings = () => {
                         </CustomTextRegular>
                     </View>
                 </TouchableOpacity>
+            </View>
+            <View style={styles.debugCard}>
+                <View style={styles.debugRow}>
+                    <MaterialIcons name="info-outline" size={resize(13)} color={gray} />
+                    <CustomTextRegular style={styles.debugLabel}>Version</CustomTextRegular>
+                    <CustomTextMedium style={styles.debugValue}>
+                        {Constants.expoConfig?.version ?? '—'}
+                    </CustomTextMedium>
+                </View>
+                <View style={styles.debugDivider} />
+                <View style={styles.debugRow}>
+                    <MaterialIcons name="phone-android" size={resize(13)} color={gray} />
+                    <CustomTextRegular style={styles.debugLabel}>Platform</CustomTextRegular>
+                    <CustomTextMedium style={styles.debugValue}>
+                        {Platform.OS} {Platform.Version}
+                    </CustomTextMedium>
+                </View>
             </View>
         </ScrollView>
     );
@@ -339,6 +357,34 @@ const styles = StyleSheet.create({
         ...general.fontSize6,
         color: gray,
         marginTop: resize(3),
+    },
+    debugCard: {
+        marginTop: resize(14),
+        backgroundColor: white,
+        borderRadius: resize(16),
+        paddingHorizontal: resize(16),
+        paddingVertical: resize(4),
+        ...general.shaddowLighter,
+    },
+    debugRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: resize(8),
+        paddingVertical: resize(11),
+    },
+    debugLabel: {
+        ...general.fontSize6,
+        color: gray,
+        flex: 1,
+    },
+    debugValue: {
+        ...general.fontSize6,
+        color: black,
+    },
+    debugDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: lightGray,
+        marginHorizontal: resize(-16),
     },
 });
 
