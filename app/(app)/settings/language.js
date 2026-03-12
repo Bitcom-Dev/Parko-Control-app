@@ -1,109 +1,205 @@
 import { Stack } from 'expo-router';
 import React, { useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, Pressable, ScrollView} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { useSession } from '../../../context/userContext';
 import { useMessage } from '../../../util/messages';
-import { Entypo, Octicons } from '@expo/vector-icons';
-import { black, gray, green, lightOrange, white } from '../../../util/colors';
-import { resize, standardMin, general } from '../../../util/style';
+import { MaterialIcons } from '@expo/vector-icons';
+import { black, gray, lightGray, lightOrange, purple, white } from '../../../util/colors';
+import { resize, general } from '../../../util/style';
 
-const Checkbox = ({style, value, onPress}) => {
-    return (
-        <Pressable style={style} onPress={onPress}>
-            <Entypo name="circle" size={parseInt(standardMin / 500 * 10) + 10} color={value ? green : gray} />
-            {value && <Octicons style={{position: 'absolute', alignSelf:'center'}} name="dot-fill" size={parseInt(standardMin / 500 * 10) + 10} color={green} /> }
-        </Pressable>
-    )
-}
-
+const LANGUAGES = [
+    { code: 'en', label: 'English', flag: '🇬🇧' },
+    { code: 'ro', label: 'Română', flag: '🇷🇴' },
+];
 
 const Language = () => {
-    const {language, setLanguage} = useSession();
-    const [english, setEnglish] = useState(language === 'en' ? true : false);
-    const [romanian, setRomanian] = useState(language === 'ro' ? true : false);
+    const { language, setLanguage } = useSession();
     const { LanguageScreen: strings } = useMessage();
+
     return (
-        <ScrollView>
-            <Stack.Screen 
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+            <Stack.Screen
                 options={{
-                    title: "",
-                    headerStyle: {
-                        backgroundColor: white,
-                    },
+                    title: strings.main,
+                    headerStyle: { backgroundColor: lightOrange },
                     headerTintColor: black,
-                    statusBarColor: white,
-                    statusBarStyle: 'dark'
+                    statusBarColor: lightOrange,
+                    statusBarStyle: 'dark',
                 }}
             />
-            <View style={styles.yellow}>
-                <CustomTextMedium style={styles.mainText}>{strings.main}</CustomTextMedium>
-                <CustomTextBold style={styles.descriptionText}>{strings.desc}</CustomTextBold>
+
+            <View style={styles.heroCard}>
+                <View style={styles.heroDecorPrimary} />
+                <View style={styles.heroDecorSecondary} />
+                <View style={styles.heroBadge}>
+                    <MaterialIcons name="language" size={resize(16)} color={white} />
+                    <CustomTextMedium style={styles.heroBadgeText}>{strings.main}</CustomTextMedium>
+                </View>
+                <CustomTextBold style={styles.heroTitle}>{strings.main}</CustomTextBold>
+                <CustomTextRegular style={styles.heroSubtitle}>{strings.desc}</CustomTextRegular>
             </View>
-            <CustomTextRegular style={styles.title}>{strings.title}</CustomTextRegular>
-            <TouchableOpacity onPress={() => {setRomanian(false);setEnglish(true);setLanguage('en');}} style={styles.lang}>
-                <Checkbox style={styles.checkbox} value={english} onPress={() => {setRomanian(false);setEnglish(true);setLanguage('en');}} />
-                <CustomTextRegular style={styles.langText}>English</CustomTextRegular>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => {setRomanian(true);setEnglish(false);setLanguage('ro');}} style={styles.lang}>
-                <Checkbox style={styles.checkbox} value={romanian} onPress={() => {setRomanian(true);setEnglish(false);setLanguage('ro');}} />
-                <CustomTextRegular style={styles.langText}>Română</CustomTextRegular>
-            </TouchableOpacity>
+
+            <CustomTextBold style={styles.sectionTitle}>{strings.title}</CustomTextBold>
+
+            <View style={styles.langCard}>
+                {LANGUAGES.map((lang, index) => {
+                    const selected = language === lang.code;
+                    return (
+                        <TouchableOpacity
+                            key={lang.code}
+                            style={[
+                                styles.langItem,
+                                selected && styles.langItemSelected,
+                                index !== LANGUAGES.length - 1 && styles.langItemBorder,
+                            ]}
+                            activeOpacity={0.75}
+                            onPress={() => setLanguage(lang.code)}
+                        >
+                            <View style={styles.langIconWrap}>
+                                <CustomTextBold style={styles.langFlag}>{lang.flag}</CustomTextBold>
+                            </View>
+                            <CustomTextMedium style={[styles.langLabel, selected && styles.langLabelSelected]}>
+                                {lang.label}
+                            </CustomTextMedium>
+                            <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                                {selected && <View style={styles.radioInner} />}
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
         </ScrollView>
     );
-}
+};
 
 export default Language;
 
 const styles = StyleSheet.create({
-    yellow: {
-        backgroundColor: lightOrange,
-        paddingTop: 50,    
-        paddingHorizontal: 20,    
-        paddingBottom: 50,  
-        shadowColor: black,
-        shadowOffset: {
-            width: 0,
-            height: 8,
-        },
-        shadowOpacity: 0.44,
-        shadowRadius: 10.32,
-        
-        elevation: 16,
-    },
-    mainText: {
-        ...general.fontSize16,
-    },
-    descriptionText: {
-        ...general.fontSize12,
-        color: gray,
-        marginLeft: 10
-    },
-    lang: {
-        flexDirection: 'row',
-        paddingLeft: resize(30),
-        alignItems: 'center',
-        paddingVertical: resize(15)
-    },
-    scroll: {
+    container: {
         flex: 1,
+        backgroundColor: lightOrange,
     },
-    checkbox: {
-        flex:1,
+    contentContainer: {
+        paddingHorizontal: resize(16),
+        paddingTop: resize(16),
+        paddingBottom: resize(36),
+    },
+    heroCard: {
+        backgroundColor: purple,
+        borderRadius: resize(24),
+        padding: resize(20),
+        overflow: 'hidden',
+        marginBottom: resize(22),
+        ...general.shaddowLight,
+    },
+    heroDecorPrimary: {
+        position: 'absolute',
+        width: resize(160),
+        height: resize(160),
+        borderRadius: resize(80),
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: resize(-40),
+        right: resize(-30),
+    },
+    heroDecorSecondary: {
+        position: 'absolute',
+        width: resize(110),
+        height: resize(110),
+        borderRadius: resize(55),
+        backgroundColor: 'rgba(243,135,19,0.22)',
+        bottom: resize(-30),
+        left: resize(-20),
+    },
+    heroBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center'
+        alignSelf: 'flex-start',
+        gap: resize(6),
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: resize(10),
+        paddingVertical: resize(6),
+        borderRadius: resize(999),
+        marginBottom: resize(14),
     },
-    langText: {
-        flexGrow: 4,
-        ...general.fontSize12,
+    heroBadgeText: {
+        ...general.fontSize6,
+        color: white,
     },
-    title: {
+    heroTitle: {
         ...general.fontSize14,
+        color: white,
+        marginBottom: resize(6),
+    },
+    heroSubtitle: {
+        ...general.fontSize6,
+        color: 'rgba(255,255,255,0.80)',
+        lineHeight: resize(18),
+    },
+    sectionTitle: {
+        ...general.fontSize8,
         color: gray,
-        fontWeight: 'bold',
-        paddingTop: 30,
-        paddingBottom: 15,
-        paddingLeft: 50,
-    }
-})
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
+        marginBottom: resize(10),
+        paddingHorizontal: resize(4),
+    },
+    langCard: {
+        backgroundColor: white,
+        borderRadius: resize(18),
+        overflow: 'hidden',
+        ...general.shaddowLighter,
+    },
+    langItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: resize(16),
+        paddingVertical: resize(16),
+        gap: resize(14),
+    },
+    langItemSelected: {
+        backgroundColor: purple + '08',
+    },
+    langItemBorder: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: lightGray,
+    },
+    langIconWrap: {
+        width: resize(44),
+        height: resize(44),
+        borderRadius: resize(14),
+        backgroundColor: '#f6f6f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    langFlag: {
+        fontSize: resize(24),
+    },
+    langLabel: {
+        flex: 1,
+        ...general.fontSize10,
+        color: black,
+    },
+    langLabelSelected: {
+        color: purple,
+    },
+    radioOuter: {
+        width: resize(22),
+        height: resize(22),
+        borderRadius: resize(11),
+        borderWidth: 2,
+        borderColor: lightGray,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    radioOuterSelected: {
+        borderColor: purple,
+    },
+    radioInner: {
+        width: resize(11),
+        height: resize(11),
+        borderRadius: resize(6),
+        backgroundColor: purple,
+    },
+});
 

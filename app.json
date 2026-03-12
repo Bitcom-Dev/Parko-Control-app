@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#890350"
     },
     "runtimeVersion": {
@@ -31,7 +31,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#fff"
+        "backgroundColor": "#890350"
       },
       "package": "com.bitcom.parkocontrol.bordeac03",
       "versionCode": 1,

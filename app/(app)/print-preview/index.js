@@ -20,9 +20,10 @@ import {
 	COMMANDS as THERMAL_COMMANDS,
 } from 'react-native-thermal-receipt-printer-image-qr';
 
+import { Stack } from 'expo-router';
 import { resize, general } from '../../../util/style';
-import { purple, white, black, orange, green, red } from '../../../util/colors';
-import { CustomTextBold, CustomTextMedium } from '../../../util/CustomText';
+import { purple, white, black, orange, green, red, lightOrange, gray } from '../../../util/colors';
+import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
 import { useMessage } from '../../../util/messages';
 
 import { getPrintPreview } from '../../../util/printPreviewStore';
@@ -913,6 +914,15 @@ const PrintPreviewScreen = () => {
 
 	return (
 		<View style={styles.screen}>
+			<Stack.Screen
+				options={{
+					title: strings?.title || 'Print Preview',
+					headerStyle: { backgroundColor: lightOrange },
+					headerTintColor: purple,
+					statusBarColor: lightOrange,
+					statusBarStyle: 'dark',
+				}}
+			/>
 			<Modal
 				transparent
 				visible={printerModalOpen}
@@ -922,15 +932,17 @@ const PrintPreviewScreen = () => {
 				<View style={styles.modalBackdrop}>
 					<View style={styles.modalCard}>
 						<View style={styles.modalHeader}>
-							<CustomTextBold style={styles.modalTitle}>{msg('selectPrinterBle', 'Select printer (BLE)')}</CustomTextBold>
-							<Pressable onPress={() => setPrinterModalOpen(false)} hitSlop={10}>
-								<Text style={styles.modalClose}>✕</Text>
-							</Pressable>
-						</View>
+						<View style={styles.modalHeaderDecorL} />
+						<View style={styles.modalHeaderDecorR} />
+						<CustomTextBold style={styles.modalTitle}>{msg('selectPrinterBle', 'Select printer (BLE)')}</CustomTextBold>
+						<Pressable onPress={() => setPrinterModalOpen(false)} hitSlop={10} style={styles.modalCloseBtn}>
+							<Text style={styles.modalClose}>✕</Text>
+						</Pressable>
+					</View>
 
-						<Text style={styles.modalHint}>
-							{msg('classicBluetoothHint', 'If your printer is Bluetooth Classic (SPP) (e.g. many Datecs DPP models), it will not appear here.')}
-						</Text>
+					<Text style={styles.modalHint}>
+						{msg('classicBluetoothHint', 'If your printer is Bluetooth Classic (SPP) (e.g. many Datecs DPP models), it will not appear here.')}
+					</Text>
 						{bleError ? <Text style={styles.modalError}>{bleError}</Text> : null}
 
 						<View style={styles.modalActions}>
@@ -978,7 +990,7 @@ const PrintPreviewScreen = () => {
 							ListEmptyComponent={
 								bleLoading ? null : <Text style={styles.modalEmpty}>{msg('noBlePrintersFound', 'No BLE printers found.')}</Text>
 							}
-							contentContainerStyle={{ paddingBottom: 10 }}
+							contentContainerStyle={{ paddingTop: resize(10), paddingBottom: resize(16) }}
 						/>
 					</View>
 				</View>
@@ -1133,7 +1145,7 @@ const s = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: resize(20),
-		backgroundColor: white,
+		backgroundColor: lightOrange,
 	},
 	centerText: {
 		...general.fontSize9,
@@ -1146,7 +1158,7 @@ const s = StyleSheet.create({
 const styles = StyleSheet.create({
 	screen: {
 		flex: 1,
-		backgroundColor: '#E9ECF1',
+		backgroundColor: lightOrange,
 	},
 	scroll: {
 		flex: 1,
@@ -1162,12 +1174,17 @@ const styles = StyleSheet.create({
 		left: 0,
 		right: 0,
 		bottom: 0,
-		paddingHorizontal: 12,
-		paddingTop: 10,
-		paddingBottom: 14,
-		backgroundColor: 'rgba(233,236,241,0.96)',
-		borderTopWidth: 1,
-		borderTopColor: '#E1E4EA',
+		paddingHorizontal: resize(14),
+		paddingTop: resize(12),
+		paddingBottom: resize(16),
+		backgroundColor: 'rgba(255,243,231,0.97)',
+		borderTopLeftRadius: resize(18),
+		borderTopRightRadius: resize(18),
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.07,
+		shadowRadius: 8,
+		elevation: 6,
 	},
 	connectionRow: {
 		flexDirection: 'row',
@@ -1200,22 +1217,22 @@ const styles = StyleSheet.create({
 	},
 	reconnectButton: {
 		flex: 1,
-		height: 48,
-		borderRadius: 12,
+		height: resize(48),
+		borderRadius: resize(14),
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: white,
-		borderWidth: 1,
+		borderWidth: 1.5,
 		borderColor: purple,
 	},
 	reconnectButtonText: {
 		color: purple,
-		fontSize: 15,
+		...general.fontSize12,
 	},
 	printButton: {
 		flex: 1,
-		height: 48,
-		borderRadius: 12,
+		height: resize(48),
+		borderRadius: resize(14),
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: purple,
@@ -1228,127 +1245,163 @@ const styles = StyleSheet.create({
 	},
 	printButtonText: {
 		color: white,
-		fontSize: 16,
+		...general.fontSize12,
 	},
 	modalBackdrop: {
 		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.35)',
+		backgroundColor: 'rgba(0,0,0,0.2)',
 		justifyContent: 'flex-end',
 	},
 	modalCard: {
-		backgroundColor: '#fff',
-		borderTopLeftRadius: 16,
-		borderTopRightRadius: 16,
-		paddingHorizontal: 14,
-		paddingTop: 14,
+		backgroundColor: lightOrange,
+		borderTopLeftRadius: resize(24),
+		borderTopRightRadius: resize(24),
+		overflow: 'hidden',
 		maxHeight: '80%',
 	},
 	modalHeader: {
+		backgroundColor: purple,
+		paddingTop: resize(18),
+		paddingBottom: resize(16),
+		paddingHorizontal: resize(18),
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 6,
+		overflow: 'hidden',
+	},
+	modalHeaderDecorL: {
+		position: 'absolute',
+		width: resize(100),
+		height: resize(100),
+		borderRadius: resize(50),
+		backgroundColor: 'rgba(255,255,255,0.07)',
+		top: -resize(35),
+		left: -resize(20),
+	},
+	modalHeaderDecorR: {
+		position: 'absolute',
+		width: resize(70),
+		height: resize(70),
+		borderRadius: resize(35),
+		backgroundColor: 'rgba(255,255,255,0.07)',
+		top: -resize(15),
+		right: resize(60),
 	},
 	modalTitle: {
-		fontSize: 16,
-		color: '#111',
+		...general.fontSize14,
+		color: white,
+		flex: 1,
+	},
+	modalCloseBtn: {
+		backgroundColor: 'rgba(255,255,255,0.2)',
+		borderRadius: resize(20),
+		padding: resize(6),
 	},
 	modalClose: {
-		fontSize: 18,
-		color: '#111',
-		paddingHorizontal: 6,
-		paddingVertical: 4,
+		fontSize: resize(14),
+		color: white,
+		lineHeight: resize(16),
 	},
 	modalHint: {
-		fontSize: 12,
-		color: '#667085',
-		marginBottom: 10,
+		...general.fontSize9,
+		color: gray,
+		margin: resize(14),
+		marginBottom: resize(6),
 	},
 	modalError: {
-		fontSize: 12,
-		color: '#B42318',
-		marginBottom: 10,
+		...general.fontSize9,
+		color: red,
+		marginHorizontal: resize(14),
+		marginBottom: resize(8),
 	},
 	modalActions: {
 		flexDirection: 'row',
-		gap: 10,
-		marginBottom: 10,
+		gap: resize(10),
+		marginHorizontal: resize(14),
+		marginBottom: resize(10),
 	},
 	modalButton: {
 		flex: 1,
-		height: 40,
-		borderRadius: 10,
+		height: resize(40),
+		borderRadius: resize(12),
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: purple,
 	},
 	modalButtonSecondary: {
 		flex: 1,
-		height: 40,
-		borderRadius: 10,
+		height: resize(40),
+		borderRadius: resize(12),
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#EEF2F6',
+		backgroundColor: white,
+		borderWidth: 1,
+		borderColor: purple,
 	},
 	modalButtonPressed: {
-		opacity: 0.9,
+		opacity: 0.85,
 	},
 	modalButtonText: {
 		color: white,
-		fontSize: 13,
-		fontWeight: '700',
+		...general.fontSize10,
 	},
 	modalButtonSecondaryText: {
-		color: '#344054',
-		fontSize: 13,
-		fontWeight: '700',
+		color: purple,
+		...general.fontSize10,
 	},
 	deviceRow: {
-		paddingVertical: 10,
-		borderTopWidth: 1,
-		borderTopColor: '#EEF2F6',
+		backgroundColor: white,
+		borderRadius: resize(12),
+		paddingVertical: resize(12),
+		paddingHorizontal: resize(14),
+		marginHorizontal: resize(14),
+		marginBottom: resize(8),
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+		elevation: 1,
 	},
 	deviceRowPressed: {
-		backgroundColor: '#F8FAFC',
+		opacity: 0.8,
 	},
 	deviceName: {
-		fontSize: 14,
-		color: '#111',
-		fontWeight: '700',
+		...general.fontSize12,
+		color: black,
 	},
 	deviceMac: {
-		fontSize: 12,
-		color: '#667085',
-		marginTop: 2,
+		...general.fontSize9,
+		color: gray,
+		marginTop: resize(2),
 	},
 	modalEmpty: {
-		paddingVertical: 16,
+		paddingVertical: resize(20),
 		textAlign: 'center',
-		color: '#667085',
-		fontSize: 13,
+		color: gray,
+		...general.fontSize10,
 	},
 	meta: {
 		width: '100%',
 		maxWidth: 520,
-		paddingHorizontal: 12,
-		marginBottom: 8,
+		paddingHorizontal: resize(12),
+		marginBottom: resize(8),
 	},
 	metaText: {
 		fontFamily: monoFontRegular,
-		fontSize: 12,
-		color: '#667085',
+		fontSize: resize(10),
+		color: gray,
 	},
 	paper: {
 		backgroundColor: '#FEFEFE',
-		borderRadius: 10,
-		paddingHorizontal: 10,
-		paddingVertical: 10,
+		borderRadius: resize(12),
+		paddingHorizontal: resize(10),
+		paddingVertical: resize(10),
 		borderWidth: 1,
-		borderColor: '#E1E4EA',
+		borderColor: '#e8e8e8',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.12,
-		shadowRadius: 10,
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
 		elevation: 2,
 	},
 	block: {

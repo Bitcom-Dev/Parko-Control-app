@@ -32,6 +32,7 @@ const Layout = () => {
     const [uuid, setUUID] = useState(null);
     const [user, setUser] = useState(null);
 	const [appIsReady, setAppIsReady] = useState(false);
+	const [minTimeReached, setMinTimeReached] = useState(false);
 	const [location, setLocation] = useState(null);
 	const [locationPermission, setLocationPermission] = useState(null);
 	const [appState, setAppState] = useState(AppState.currentState);
@@ -86,15 +87,22 @@ const Layout = () => {
 
 	const getMyLocation = async () => {
 		try {
-			const location = await Location.getCurrentPositionAsync({accuracy: Location.Accuracy.Highest});
-			return {
-				latitude: location.coords.latitude,
-				longitude: location.coords.longitude
-			};
-		} catch (error) {
-			console.error('Error getting location:', error);
-			return undefined;
+			const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+			if (loc?.coords?.latitude != null) {
+				return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+			}
+		} catch (_) {
+			// getCurrentPositionAsync failed (services off / timeout) — try last known
 		}
+		try {
+			const last = await Location.getLastKnownPositionAsync();
+			if (last?.coords?.latitude != null) {
+				return { latitude: last.coords.latitude, longitude: last.coords.longitude };
+			}
+		} catch (_) {
+			// no last known position either
+		}
+		return undefined;
 	};
 
 	const getDistanceInMeters = (loc1, loc2) => {
@@ -173,10 +181,15 @@ const Layout = () => {
 	  }, [refreshToken]);
 
 	useEffect(() => {
-	if ( !fontsLoaded || user === null)
-		return;
-	setAppIsReady(true);
-	}, [fontsLoaded,user]);
+		const timer = setTimeout(() => setMinTimeReached(true), 4000);
+		return () => clearTimeout(timer);
+	}, []);
+
+	useEffect(() => {
+		if ( !fontsLoaded || user === null)
+			return;
+		setAppIsReady(true);
+	}, [fontsLoaded, user]);
 
 	useEffect(() => {
 		const subscription = AppState.addEventListener('change', nextAppState => {
@@ -203,8 +216,7 @@ const Layout = () => {
 			try {
 				const loc = await getMyLocation();
 				setLocation(loc);
-			} catch (error) {
-				console.error('Error fetching location:', error);
+			} catch (_) {
 				setLocation(undefined);
 			}
 		};
@@ -242,14 +254,14 @@ const Layout = () => {
 					});
 					lastSentLocationRef.current = location;
 				} catch (error) {
-					console.error('Failed to send location:', error);
+					// console.error('Failed to send location:', error);
 				}
 			};
 			
 			sendLocation();
 	}, [location, user, accessToken]);
 
-	if (!appIsReady) return <SplashScreen />;
+	if (!appIsReady || !minTimeReached) return <SplashScreen />;
 
     return (
 		<GestureHandlerRootView style={{ flex: 1 }}>

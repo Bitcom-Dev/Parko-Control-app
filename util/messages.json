@@ -51,7 +51,17 @@
       "language": "Language",
       "logout": "Logout",
       "history": "History",
-      "printHistory": "Print History"
+      "printHistory": "Print History",
+      "preferences": "Preferences",
+      "profileHint": "Manage history, printing, and app preferences.",
+      "activeAccount": "active account",
+      "secureAccess": "secure access",
+      "modules": "modules",
+      "userFallback": "User",
+      "historySubtitle": "Recent activity and actions.",
+      "printHistorySubtitle": "Documents and previous prints.",
+      "languageSubtitle": "Select the app language.",
+      "logoutSubtitle": "Sign out of your account safely."
     },
     "CameraScreen": {
       "title": "Camera",
@@ -274,7 +284,17 @@
       "language": "Limba",
       "logout": "Deconectare",
       "history": "Istoric",
-      "printHistory": "Istoric printari"
+      "printHistory": "Istoric printari",
+      "preferences": "Preferințe",
+      "profileHint": "Gestionează istoricul, imprimările și preferințele aplicației.",
+      "activeAccount": "cont activ",
+      "secureAccess": "acces securizat",
+      "modules": "module",
+      "userFallback": "Utilizator",
+      "historySubtitle": "Activitate și acțiuni recente.",
+      "printHistorySubtitle": "Documente și printări anterioare.",
+      "languageSubtitle": "Selectează limba aplicației.",
+      "logoutSubtitle": "Ieși din contul curent în siguranță."
     },
     "CameraScreen": {
       "title": "Camera",

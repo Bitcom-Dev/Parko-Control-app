@@ -491,11 +491,15 @@ const LPRScreen = () => {
 	// Set header options with filter button
 	useEffect(() => {
 		navigation.setOptions({
+			headerStyle: { backgroundColor: lightOrange },
+			headerTintColor: purple,
+			statusBarColor: lightOrange,
+			statusBarStyle: 'dark',
 			headerRight: () => (
 				<TouchableOpacity
 					onPress={() => setShowFilters(true)}
 				>
-					<Ionicons name="settings-sharp" size={resize(30)} color={white} />
+					<Ionicons name="settings-sharp" size={resize(30)} color={purple} />
 				</TouchableOpacity>
 			),
 		});
@@ -785,9 +789,14 @@ const LPRScreen = () => {
 				justifyContent: 'space-between',
 				paddingVertical: resize(10),
 				paddingHorizontal: resize(20),
-				borderTopWidth: 1,
-				borderTopColor: lightGray,
+				borderTopLeftRadius: resize(18),
+				borderTopRightRadius: resize(18),
 				backgroundColor: white,
+				shadowColor: '#000',
+				shadowOffset: { width: 0, height: -2 },
+				shadowOpacity: 0.06,
+				shadowRadius: 6,
+				elevation: 4,
 			}}
 		>
 			<TouchableOpacity
@@ -847,29 +856,27 @@ const LPRScreen = () => {
 
 	// ─── Render ────────────────────────────────────────────────────────────
 	return (
-		<View style={{ flex: 1, backgroundColor: white }}>
+		<View style={{ flex: 1, backgroundColor: lightOrange }}>
 			{/* ── Filter Modal ── */}
 			<Modal visible={showFilters} transparent={false} animationType="slide">
-				<View style={{ flex: 1, backgroundColor: white }}>
-					{/* Modal Header */}
-					<View
-						style={{
-							flexDirection: 'row',
-							justifyContent: 'space-between',
-							alignItems: 'center',
-							paddingHorizontal: resize(15),
-							paddingVertical: resize(14),
-							paddingTop: resize(50),
-							backgroundColor: white,
-							borderBottomWidth: 1,
-							borderBottomColor: lightGray,
-						}}
-					>
-						<CustomTextBold style={{ ...general.fontSize14, color: black }}>
-							{strings?.filters}
-						</CustomTextBold>
+			<View style={{ flex: 1, backgroundColor: lightOrange }}>
+				{/* Modal Header */}
+				<View
+					style={{
+						flexDirection: 'row',
+						justifyContent: 'space-between',
+						alignItems: 'center',
+						paddingHorizontal: resize(16),
+						paddingVertical: resize(14),
+						paddingTop: resize(50),
+						backgroundColor: lightOrange,
+					}}
+				>
+					<CustomTextBold style={{ ...general.fontSize14, color: purple }}>
+						{strings?.filters}
+					</CustomTextBold>
 						<TouchableOpacity onPress={() => setShowFilters(false)}>
-							<AntDesign name="close" size={resize(22)} color={black} />
+							<AntDesign name="close" size={resize(22)} color={purple} />
 						</TouchableOpacity>
 					</View>
 
@@ -960,11 +967,9 @@ const LPRScreen = () => {
 						style={{
 							flexDirection: 'row',
 							gap: resize(10),
-							paddingHorizontal: resize(15),
+							paddingHorizontal: resize(16),
 							paddingVertical: resize(15),
-							borderTopWidth: 1,
-							borderTopColor: lightGray,
-							backgroundColor: white,
+							backgroundColor: lightOrange,
 						}}
 					>
 						<TouchableOpacity
@@ -1006,13 +1011,14 @@ const LPRScreen = () => {
 			{errorMessage ? (
 				<View
 					style={{
-						marginHorizontal: resize(20),
+						marginHorizontal: resize(16),
 						marginTop: resize(10),
-						paddingHorizontal: resize(12),
+						paddingHorizontal: resize(14),
 						paddingVertical: resize(10),
-						borderColor: lightGray,
-						borderWidth: 1,
-						borderRadius: resize(6),
+						backgroundColor: white,
+						borderRadius: resize(12),
+						borderLeftWidth: resize(4),
+						borderLeftColor: orange,
 					}}
 				>
 					<CustomTextRegular style={{ ...general.fontSize10, color: black }}>

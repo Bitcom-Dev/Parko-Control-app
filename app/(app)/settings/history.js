@@ -1,14 +1,42 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
-import { useAuth, useSession } from '../../../context/userContext';
+import { useAuth } from '../../../context/userContext';
 import { useMessage } from '../../../util/messages';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { black, gray, green, lightOrange, purple, red, white } from '../../../util/colors';
-import { resize, standardMin, general } from '../../../util/style';
-import { FlashList } from "@shopify/flash-list";
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { black, gray, green, lightGray, lightOrange, purple, red, white } from '../../../util/colors';
+import { resize, general } from '../../../util/style';
 import { controlInstance } from '../../../util/instances';
+
+const timestampToString = (ts) => {
+    const date = new Date(ts);
+    const year = date.getFullYear();
+    const month = ('0' + (date.getMonth() + 1)).slice(-2);
+    const day = ('0' + date.getDate()).slice(-2);
+    const hours = ('0' + date.getHours()).slice(-2);
+    const minutes = ('0' + date.getMinutes()).slice(-2);
+    return `${hours}:${minutes}  ${day}-${month}-${year}`;
+};
+
+const Verification = ({ vehicle, ts, active, details, onPress }) => (
+    <TouchableOpacity style={styles.itemWrap} activeOpacity={0.75} onPress={onPress}>
+        <View style={[styles.itemIconWrap, { backgroundColor: active ? '#eafaf1' : '#fdf0ee' }]}>
+            <MaterialCommunityIcons
+                name={active ? 'check-circle' : 'close-circle'}
+                size={resize(24)}
+                color={active ? green : red}
+            />
+        </View>
+        <View style={styles.itemTextWrap}>
+            <CustomTextMedium style={styles.itemTitle}>{vehicle}</CustomTextMedium>
+            <CustomTextRegular style={styles.itemSubtitle}>
+                {timestampToString(ts * 1000)}
+            </CustomTextRegular>
+        </View>
+        <MaterialIcons name="chevron-right" size={resize(22)} color={gray} />
+    </TouchableOpacity>
+);
 
 const History = () => {
     const { HistoryScreen: strings } = useMessage();
@@ -16,150 +44,176 @@ const History = () => {
     const [loading, setLoading] = useState(false);
     const auth = useAuth();
     const router = useRouter();
-    const Verification = (props) => {
-        const timestampToString = (ts) => {
-            const date = new Date(ts);
-            const year = date.getFullYear();
-            const month = ('0' + (date.getMonth() + 1)).slice(-2);
-            const day = ('0' + date.getDate()).slice(-2);
-            const hours = ('0' + date.getHours()).slice(-2);
-            const minutes = ('0' + date.getMinutes()).slice(-2);
-            return `${hours}:${minutes} ${day}-${month}-${year} `;
-        }
 
-        return (
-            <TouchableOpacity
-                style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: resize(10), paddingVertical: resize(7)}}
-                activeOpacity={0.7}
-                onPress={() => router.push({pathname: "/", params: {vehicleSelected: props.vehicle, tsSelected: props.ts, details: JSON.stringify({...props.details, active: props.active})}})}
-            >
-                <View style={{
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: white,
-                    width: '90%',
-                    paddingVertical: resize(12),
-                    paddingHorizontal: resize(20),
-                    borderRadius: resize(15),
-                    gap: resize(5),
-                    elevation: 1,
-                    shadowColor: purple,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 2,
-                }}>
-                    <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
-                        <CustomTextMedium style={{...general.fontSize14, color: black}}>
-                            {props.vehicle}
-                        </CustomTextMedium>
-                        <MaterialCommunityIcons name={props.active ? "check-circle" : "close-circle"} size={resize(35)} color={props.active ? green : red} />
-                    </View>
-                    <CustomTextRegular style={{...general.fontSize10, alignSelf: 'flex-end', color: gray}}>
-                        {timestampToString(props.ts * 1000)}
-                    </CustomTextRegular>
-                </View>
-            </TouchableOpacity>
-        );
-    };
     const loadData = () => {
-        if (loading)
-            return;
+        if (loading) return;
         setLoading(true);
-        controlInstance(auth).get('/history', {params: {offset: DATA.length}})
-        .then(response => {
-            setDATA(DATA.concat(response.data));
-        })
-        .catch(error => {
-            console.log(error);
-        })
-        .finally(() => {
-            setLoading(false);
-        });
-    }
-    useEffect(() => {
-      loadData();
-    }, [])
-    
+        controlInstance(auth).get('/history', { params: { offset: DATA.length } })
+            .then(response => { setDATA(prev => prev.concat(response.data)); })
+            .catch(error => { console.log(error); })
+            .finally(() => { setLoading(false); });
+    };
+
+    useEffect(() => { loadData(); }, []);
+
     return (
-        <ScrollView contentContainerStyle={{ flex: 1 }}>
-            <Stack.Screen 
+        <View style={styles.container}>
+            <Stack.Screen
                 options={{
-                    title: "",
-                    headerStyle: {
-                        backgroundColor: white,
-                    },
+                    title: strings.main,
+                    headerStyle: { backgroundColor: lightOrange },
                     headerTintColor: black,
-                    statusBarColor: white,
-                    statusBarStyle: 'dark'
+                    statusBarColor: lightOrange,
+                    statusBarStyle: 'dark',
                 }}
             />
-            <View style={styles.yellow}>
-                <CustomTextMedium style={styles.mainText}>{strings.main}</CustomTextMedium>
-                <CustomTextBold style={styles.descriptionText}>{strings.desc}</CustomTextBold>
-            </View>
-            <FlashList
+
+            <FlatList
                 data={DATA}
-                renderItem={({ item }) => <Verification {...item} />}
-                estimatedItemSize={resize(100)}
+                keyExtractor={(item, i) => `${i}_${item?.ts ?? i}`}
+                renderItem={({ item }) => (
+                    <Verification
+                        {...item}
+                        onPress={() => router.push({
+                            pathname: '/',
+                            params: {
+                                vehicleSelected: item.vehicle,
+                                tsSelected: item.ts,
+                                details: JSON.stringify({ ...item.details, active: item.active }),
+                            },
+                        })}
+                    />
+                )}
+                ItemSeparatorComponent={() => <View style={{ height: resize(10) }} />}
                 onEndReached={loadData}
-                onEndReachedThreshold={.1}
-                ListFooterComponent={loading ? <ActivityIndicator size="large" color={purple} /> : null}
+                onEndReachedThreshold={0.1}
+                ListHeaderComponent={
+                    <View style={styles.heroCard}>
+                        <View style={styles.heroDecorPrimary} />
+                        <View style={styles.heroDecorSecondary} />
+                        <View style={styles.heroBadge}>
+                            <MaterialIcons name="history" size={resize(16)} color={white} />
+                            <CustomTextMedium style={styles.heroBadgeText}>{strings.main}</CustomTextMedium>
+                        </View>
+                        <CustomTextBold style={styles.heroTitle}>{strings.main}</CustomTextBold>
+                        <CustomTextRegular style={styles.heroSubtitle}>{strings.desc}</CustomTextRegular>
+                    </View>
+                }
+                ListFooterComponent={loading ? (
+                    <View style={{ paddingVertical: resize(20), alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={purple} />
+                    </View>
+                ) : null}
+                ListEmptyComponent={!loading ? (
+                    <View style={styles.emptyWrap}>
+                        <MaterialIcons name="history" size={resize(48)} color={lightGray} />
+                        <CustomTextRegular style={styles.emptyText}>{strings.desc}</CustomTextRegular>
+                    </View>
+                ) : null}
+                contentContainerStyle={{ paddingBottom: resize(36) }}
             />
-        </ScrollView>
+        </View>
     );
-}
+};
 
 const styles = StyleSheet.create({
-    yellow: {
+    container: {
+        flex: 1,
         backgroundColor: lightOrange,
-        paddingTop: 50,    
-        paddingHorizontal: 20,    
-        paddingBottom: 50,  
-        shadowColor: black,
-        shadowOffset: {
-            width: 0,
-            height: 8,
-        },
-        shadowOpacity: 0.44,
-        shadowRadius: 10.32,
-        
-        elevation: 16,
     },
-    mainText: {
-        ...general.fontSize16,
+    heroCard: {
+        backgroundColor: purple,
+        borderRadius: resize(24),
+        margin: resize(16),
+        marginBottom: resize(10),
+        padding: resize(20),
+        overflow: 'hidden',
+        ...general.shaddowLight,
     },
-    descriptionText: {
-        ...general.fontSize12,
-        color: gray,
-        marginLeft: 10
+    heroDecorPrimary: {
+        position: 'absolute',
+        width: resize(160),
+        height: resize(160),
+        borderRadius: resize(80),
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: resize(-40),
+        right: resize(-30),
     },
-    lang: {
+    heroDecorSecondary: {
+        position: 'absolute',
+        width: resize(110),
+        height: resize(110),
+        borderRadius: resize(55),
+        backgroundColor: 'rgba(243,135,19,0.22)',
+        bottom: resize(-30),
+        left: resize(-20),
+    },
+    heroBadge: {
         flexDirection: 'row',
-        paddingLeft: resize(30),
         alignItems: 'center',
-        paddingVertical: resize(15)
+        alignSelf: 'flex-start',
+        gap: resize(6),
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: resize(10),
+        paddingVertical: resize(6),
+        borderRadius: resize(999),
+        marginBottom: resize(14),
     },
-    scroll: {
+    heroBadgeText: {
+        ...general.fontSize6,
+        color: white,
+    },
+    heroTitle: {
+        ...general.fontSize14,
+        color: white,
+        marginBottom: resize(6),
+    },
+    heroSubtitle: {
+        ...general.fontSize6,
+        color: 'rgba(255,255,255,0.80)',
+        lineHeight: resize(18),
+    },
+    itemWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: white,
+        borderRadius: resize(18),
+        marginHorizontal: resize(16),
+        paddingHorizontal: resize(14),
+        paddingVertical: resize(14),
+        ...general.shaddowLighter,
+    },
+    itemIconWrap: {
+        width: resize(44),
+        height: resize(44),
+        borderRadius: resize(14),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: resize(14),
+    },
+    itemTextWrap: {
         flex: 1,
     },
-    checkbox: {
-        flex:1,
-        alignItems: 'center',
-        justifyContent: 'center'
+    itemTitle: {
+        ...general.fontSize10,
+        color: black,
     },
-    langText: {
-        flexGrow: 4,
-        ...general.fontSize12,
-    },
-    title: {
-        ...general.fontSize14,
+    itemSubtitle: {
+        ...general.fontSize6,
         color: gray,
-        fontWeight: 'bold',
-        paddingTop: 30,
-        paddingBottom: 15,
-        paddingLeft: 50,
-    }
-})
+        marginTop: resize(3),
+    },
+    emptyWrap: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: resize(40),
+        gap: resize(10),
+    },
+    emptyText: {
+        ...general.fontSize8,
+        color: gray,
+        textAlign: 'center',
+    },
+});
 
 export default History;

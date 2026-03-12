@@ -4,10 +4,10 @@ import { resize, general } from '../../../util/style';
 import { purple, white, black, gray, lightGray, lighterMoreGray, orange, lightOrange } from '../../../util/colors';
 import useMessage from '../../../util/messages';
 import { CustomTextMedium, CustomTextRegular, CustomTextBold } from '../../../util/CustomText';
-import { useAuth } from '../../../context/userContext';
+import { useAuth, useSession } from '../../../context/userContext';
 import { lprInstance, notaConstatareInstance } from '../../../util/instances';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
@@ -24,6 +24,7 @@ const NotaConstatareScreen = () => {
 
 	const { NotaConstatareScreen: strings } = useMessage();
 	const auth = useAuth();
+	const { user } = useSession();
 	const authRef = useRef(auth);
 	const params = useLocalSearchParams();
 	const presetRef = useRef({ enabled: false, code: 'unpaid_parking', lock: true });
@@ -51,6 +52,51 @@ const NotaConstatareScreen = () => {
 			.replace(/ł/g, 'l')
 			.replace(/Ł/g, 'L');
 	};
+
+	const normalizeSearchToken = useCallback((value) => {
+		return String(stripDiacritics(value) || '')
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '_')
+			.replace(/^_+|_+$/g, '');
+	}, []);
+
+	const agentConstatatorName = useMemo(() => {
+		const fullName = user?.fullName || user?.fullname || user?.name;
+		if (typeof fullName === 'string' && fullName.trim()) {
+			return stripDiacritics(fullName).trim();
+		}
+
+		const fallbackName = [user?.firstName, user?.lastName]
+			.filter((item) => typeof item === 'string' && item.trim())
+			.join(' ')
+			.trim();
+
+		return fallbackName ? stripDiacritics(fallbackName) : '';
+	}, [user]);
+
+	const isAgentConstatatorRequirement = useCallback((requirement) => {
+		const key = normalizeSearchToken(requirement?.value);
+		const label = normalizeSearchToken(requirement?.label);
+
+		const exactMatches = new Set([
+			'agent_constatator',
+			'nume_agent',
+			'nume_agent_constatator',
+			'numele_agentului_constatator',
+		]);
+
+		if (exactMatches.has(key) || exactMatches.has(label)) return true;
+
+		const combinedMatches = [key, label].some((token) => {
+			if (!token) return false;
+			const hasAgent = token.includes('agent');
+			const hasConstatator = token.includes('constatator');
+			const hasName = token.includes('nume');
+			return (hasAgent && hasConstatator) || (hasAgent && hasName);
+		});
+
+		return combinedMatches;
+	}, [normalizeSearchToken]);
 
 	const getViolationValueForRequirement = useCallback((violation, requirementKey, usePjVariant = false) => {
 		if (!violation || !requirementKey) return undefined;
@@ -176,7 +222,7 @@ const NotaConstatareScreen = () => {
 				// Filter only active violation codes
 				const activeCodes = response.data.filter((code) => code.is_active);
 				setViolationCodes(activeCodes);
-				console.log('Fetched violation codes:', activeCodes);
+				// console.log('Fetched violation codes:', activeCodes);
 
 				const preset = presetRef.current;
 				if (preset?.enabled && !selectedViolation) {
@@ -274,6 +320,15 @@ const NotaConstatareScreen = () => {
 							return;
 						}
 
+						if (
+							String(req?.type || '').toUpperCase() === 'STRING' &&
+							agentConstatatorName &&
+							isAgentConstatatorRequirement(req)
+						) {
+							initialValues[key] = agentConstatatorName;
+							return;
+						}
+
 						if (key === 'amount' && mappedViolationValue !== null && mappedViolationValue !== undefined) {
 							initialValues[key] = coercePrefillValue(req.type, mappedViolationValue);
 							// editable on purpose
@@ -332,7 +387,7 @@ const NotaConstatareScreen = () => {
 			setFormValues({});
 			setLockedFields({});
 		}
-	}, [selectedViolation, strings?.loadError, formatDaysToDueValue, getViolationValueForRequirement]);
+	}, [selectedViolation, strings?.loadError, formatDaysToDueValue, getViolationValueForRequirement, agentConstatatorName, isAgentConstatatorRequirement]);
 
 	const hasLocFaptaRequirement = useMemo(
 		() => requirements.some((req) => req?.value === 'LOC_FAPTA'),
@@ -481,18 +536,34 @@ const NotaConstatareScreen = () => {
 	}, [setPhotoAndBind, strings?.photoLoadError]);
 
 	const getDeviceCoordinates = useCallback(async () => {
-		const perm = await Location.requestForegroundPermissionsAsync();
-		if (!perm?.granted) {
-			throw new Error(strings?.locationPermissionRequired || 'Location permission required');
+		try {
+			const perm = await Location.requestForegroundPermissionsAsync();
+			if (!perm?.granted) {
+				return { lat: null, long: null };
+			}
+			try {
+				const pos = await Location.getCurrentPositionAsync({
+					accuracy: Location.Accuracy.Balanced,
+				});
+				if (pos?.coords?.latitude != null) {
+					return { lat: pos.coords.latitude, long: pos.coords.longitude };
+				}
+			} catch (_) {
+				// getCurrentPositionAsync failed (services off, timeout, etc.) — try last known
+			}
+			try {
+				const last = await Location.getLastKnownPositionAsync();
+				if (last?.coords?.latitude != null) {
+					return { lat: last.coords.latitude, long: last.coords.longitude };
+				}
+			} catch (_) {
+				// no last known position either
+			}
+		} catch (_) {
+			// permission request failed
 		}
-		const pos = await Location.getCurrentPositionAsync({
-			accuracy: Location.Accuracy.Balanced,
-		});
-		return {
-			lat: pos?.coords?.latitude,
-			long: pos?.coords?.longitude,
-		};
-	}, [strings?.locationPermissionRequired]);
+		return { lat: null, long: null };
+	}, []);
 
 	const tryConvertToJpegBase64 = useCallback(async (base64) => {
 		if (!base64) return '';
@@ -1338,6 +1409,15 @@ const NotaConstatareScreen = () => {
 			contentContainerStyle={styles.contentContainer}
 			keyboardShouldPersistTaps="handled"
 		>
+			<Stack.Screen
+				options={{
+					title: strings.title,
+					headerStyle: { backgroundColor: lightOrange },
+					headerTintColor: purple,
+					statusBarColor: lightOrange,
+					statusBarStyle: 'dark',
+				}}
+			/>
 			{/* Camera Modal */}
 			<Modal
 				visible={cameraVisible}
@@ -1377,12 +1457,16 @@ const NotaConstatareScreen = () => {
 				</View>
 			</Modal>
 
-			{/* Header */}
-			<View style={styles.header}>
-				<MaterialIcons name="description" size={resize(32)} color={purple} />
-				<CustomTextBold style={styles.headerTitle}>
-					{strings?.title || 'Nota de Constatare'}
-				</CustomTextBold>
+			{/* Hero Card */}
+			<View style={styles.heroCard}>
+				<View style={styles.heroDecorPrimary} />
+				<View style={styles.heroDecorSecondary} />
+				<View style={styles.heroBadge}>
+					<MaterialIcons name="description" size={resize(16)} color={white} />
+					<CustomTextMedium style={styles.heroBadgeText}>{strings?.title || 'Nota de Constatare'}</CustomTextMedium>
+				</View>
+				<CustomTextBold style={styles.heroTitle}>{strings?.title || 'Nota de Constatare'}</CustomTextBold>
+				<CustomTextRegular style={styles.heroSubtitle}>{strings?.selectViolationType || 'Select a violation type to continue'}</CustomTextRegular>
 			</View>
 
 			{/* Violation Type Selector */}
@@ -1661,15 +1745,15 @@ const NotaConstatareScreen = () => {
 const styles = {
 	container: {
 		flex: 1,
-		backgroundColor: white,
+		backgroundColor: lightOrange,
 	},
 	contentContainer: {
 		paddingBottom: resize(40),
 	},
 	continueWrap: {
 		paddingHorizontal: resize(16),
-		paddingTop: resize(10),
-		paddingBottom: resize(24),
+		paddingTop: resize(4),
+		paddingBottom: resize(32),
 	},
 	continueButton: {
 		backgroundColor: purple,
@@ -1691,36 +1775,82 @@ const styles = {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: white,
+		backgroundColor: lightOrange,
 		padding: resize(20),
 	},
-	header: {
+	heroCard: {
+		backgroundColor: purple,
+		borderRadius: resize(24),
+		margin: resize(16),
+		marginBottom: resize(10),
+		padding: resize(20),
+		overflow: 'hidden',
+		...general.shaddowLight,
+	},
+	heroDecorPrimary: {
+		position: 'absolute',
+		width: resize(160),
+		height: resize(160),
+		borderRadius: resize(80),
+		backgroundColor: 'rgba(255,255,255,0.08)',
+		top: resize(-40),
+		right: resize(-30),
+	},
+	heroDecorSecondary: {
+		position: 'absolute',
+		width: resize(110),
+		height: resize(110),
+		borderRadius: resize(55),
+		backgroundColor: 'rgba(243,135,19,0.22)',
+		bottom: resize(-30),
+		left: resize(-20),
+	},
+	heroBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		padding: resize(20),
-		paddingBottom: resize(10),
-		borderBottomWidth: 1,
-		borderBottomColor: lighterMoreGray,
+		alignSelf: 'flex-start',
+		gap: resize(6),
+		backgroundColor: 'rgba(255,255,255,0.15)',
+		paddingHorizontal: resize(10),
+		paddingVertical: resize(6),
+		borderRadius: resize(999),
+		marginBottom: resize(14),
 	},
-	headerTitle: {
-		...general.fontSize12,
-		color: purple,
-		marginLeft: resize(12),
+	heroBadgeText: {
+		...general.fontSize6,
+		color: white,
+	},
+	heroTitle: {
+		...general.fontSize14,
+		color: white,
+		marginBottom: resize(6),
+	},
+	heroSubtitle: {
+		...general.fontSize6,
+		color: 'rgba(255,255,255,0.80)',
+		lineHeight: resize(18),
 	},
 	section: {
+		marginHorizontal: resize(16),
+		marginBottom: resize(12),
 		padding: resize(16),
-		paddingTop: resize(20),
+		paddingTop: resize(18),
+		backgroundColor: white,
+		borderRadius: resize(18),
+		...general.shaddowLighter,
 	},
 	sectionTitle: {
-		...general.fontSize10,
-		color: black,
+		...general.fontSize8,
+		color: gray,
+		textTransform: 'uppercase',
+		letterSpacing: 1.1,
 		marginBottom: resize(12),
 	},
 	dropdownTrigger: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		backgroundColor: lighterMoreGray,
+		backgroundColor: lightOrange,
 		borderRadius: resize(12),
 		borderWidth: 1,
 		borderColor: lightGray,
@@ -1816,7 +1946,7 @@ const styles = {
 	codeDisplayBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: lighterMoreGray,
+		backgroundColor: lightOrange,
 		borderRadius: resize(10),
 		borderWidth: 1,
 		borderColor: purple + '30',
@@ -1866,9 +1996,7 @@ const styles = {
 		marginLeft: resize(10),
 	},
 	requirementsForm: {
-		backgroundColor: lighterMoreGray,
 		borderRadius: resize(12),
-		padding: resize(16),
 	},
 	inputContainer: {
 		marginBottom: resize(16),
@@ -1988,9 +2116,14 @@ const styles = {
 
 	// ── Photo section ─────────────────────────────────────────────────
 	photoSection: {
+		marginHorizontal: resize(16),
+		marginBottom: resize(12),
 		paddingHorizontal: resize(16),
-		paddingTop: resize(20),
-		paddingBottom: resize(4),
+		paddingTop: resize(18),
+		paddingBottom: resize(16),
+		backgroundColor: white,
+		borderRadius: resize(18),
+		...general.shaddowLighter,
 	},
 	photoLabelRow: {
 		flexDirection: 'row',
