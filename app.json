@@ -20,7 +20,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bitcom.parkocontrol.bordeac03",
+      "bundleIdentifier": "com.parkocontrol.bordeac03",
       "buildNumber": "1",
       "infoPlist": {
 		"UIViewControllerBasedStatusBarAppearance": true,
@@ -33,7 +33,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#890350"
       },
-      "package": "com.bitcom.parkocontrol.bordeac03",
+      "package": "com.parkocontrol.bordeac03",
       "versionCode": 1,
     "softwareKeyboardLayoutMode": "pan",
     "permissions": [
