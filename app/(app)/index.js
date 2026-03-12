@@ -297,11 +297,38 @@ export default function Index() {
 					</View>
 				) : null}
 
-				{/* No session */}
+				{/* No session — still offer nota de constatare */}
 				{session === undefined && !loading ? (
-					<View style={styles.centerFlex}>
-						<MaterialIcons name="search-off" size={resize(48)} color={lightGray} />
-						<CustomTextMedium style={styles.noSessionText}>{strings.noSession}</CustomTextMedium>
+					<View style={styles.detailsCard}>
+						<View style={[styles.statusBanner, { backgroundColor: orange }]}>
+							<Fontisto name="dislike" size={resize(28)} color={white} />
+							<View style={{ flex: 1 }}>
+								<CustomTextBold style={styles.statusBannerTitle}>{strings.inactive}</CustomTextBold>
+								{ts ? (
+									<CustomTextRegular style={styles.statusBannerSub}>
+										{formatDate(ts * 1000)}  ·  {formatTime(ts * 1000)}
+									</CustomTextRegular>
+								) : null}
+							</View>
+						</View>
+
+						<View style={styles.detailDivider} />
+
+						<TouchableOpacity
+							activeOpacity={0.8}
+							onPress={handleInspectionNote}
+							disabled={!vehicle}
+							style={[styles.notaBtn, !vehicle && styles.notaBtnDisabled]}
+						>
+							<View style={styles.notaIconWrap}>
+								<MaterialCommunityIcons name="file-document-edit-outline" size={resize(20)} color={orange} />
+							</View>
+							<View style={{ flex: 1 }}>
+								<CustomTextMedium style={styles.notaBtnTitle}>{strings.notaConstatare}</CustomTextMedium>
+								<CustomTextRegular style={styles.notaBtnSub}>{vehicle || ''}</CustomTextRegular>
+							</View>
+							<MaterialIcons name="chevron-right" size={resize(20)} color={gray} />
+						</TouchableOpacity>
 					</View>
 				) : null}
 
