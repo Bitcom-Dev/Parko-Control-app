@@ -21,6 +21,7 @@ import {
 } from 'react-native-thermal-receipt-printer-image-qr';
 
 import { Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { resize, general } from '../../../util/style';
 import { purple, white, black, orange, green, red, lightOrange, gray } from '../../../util/colors';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
@@ -93,6 +94,18 @@ const normalizeUnicodePunctuationForEscPos = (s) =>
 
 const normalizeTextForEscPos = (s) =>
 	normalizeUnicodePunctuationForEscPos(normalizeRomanianForLegacyCodepages(s));
+
+// Race a promise against a timeout; rejects with a friendly message on expiry.
+const withTimeout = (promise, ms, message) =>
+	Promise.race([
+		promise,
+		new Promise((_, reject) =>
+			setTimeout(
+				() => reject(new Error(message || `Operation timed out after ${ms / 1000}s`)),
+				ms,
+			),
+		),
+	]);
 
 const ensureAndroidBluetoothPermissions = async () => {
 	if (Platform.OS !== 'android') return true;
@@ -474,9 +487,10 @@ const PrintPreviewScreen = () => {
 		for (const fn of maybeCalls) {
 			if (typeof fn !== 'function') continue;
 			try {
-				await fn();
+				// Give each disconnect call 3 s max; if it hangs, move on.
+				await withTimeout(fn(), 3000, 'disconnect timeout');
 			} catch (_e) {
-				// best-effort hard reset
+				// best-effort hard reset — ignore all errors
 			}
 		}
 	}, []);
@@ -485,12 +499,16 @@ const PrintPreviewScreen = () => {
 		if (!BLEPrinter || !THERMAL_COMMANDS) {
 			throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
 		}
-		await BLEPrinter.printBill(
-			withPrinterCodeTable(
-				THERMAL_COMMANDS.HARDWARE.HW_INIT + THERMAL_COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT,
-				THERMAL_COMMANDS,
+		await withTimeout(
+			BLEPrinter.printBill(
+				withPrinterCodeTable(
+					THERMAL_COMMANDS.HARDWARE.HW_INIT + THERMAL_COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT,
+					THERMAL_COMMANDS,
+				),
+				PRINTER_PRINT_OPTS,
 			),
-			PRINTER_PRINT_OPTS,
+			6000,
+			msg('printerProbeTimeout', 'Printer did not respond. It may be off or out of paper.'),
 		);
 	}, [msg]);
 
@@ -537,9 +555,17 @@ const PrintPreviewScreen = () => {
 					throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
 				}
 
-				await resetBleConnection();
-				await BLEPrinter.init();
-				const list = await BLEPrinter.getDeviceList();
+				try { await resetBleConnection(); } catch (_) {}
+				await withTimeout(
+					BLEPrinter.init(),
+					8000,
+					msg('printerInitTimeout', 'Bluetooth adapter did not respond. Make sure Bluetooth is enabled.'),
+				);
+				const list = await withTimeout(
+					BLEPrinter.getDeviceList(),
+					10000,
+					msg('printerScanTimeout', 'Bluetooth scan timed out. Make sure Bluetooth is enabled and permissions are granted.'),
+				);
 				const hit = findBleDeviceByMac(list, mac);
 
 				if (!hit) {
@@ -557,8 +583,26 @@ const PrintPreviewScreen = () => {
 				if (typeof BLEPrinter.connectPrinter !== 'function') {
 					throw new Error(msg('printerModuleUnavailable', 'Printer module is not available.'));
 				}
-				await BLEPrinter.connectPrinter(deviceMac);
-				await probeBleConnection();
+
+				// ⚠️  connectPrinter + probe can hang for 30 s+ if the printer is off,
+				// and a native GATT timeout can crash the process entirely.
+				// We race against a 12 s timeout so JS always regains control.
+				try {
+					await withTimeout(
+						BLEPrinter.connectPrinter(deviceMac),
+						12000,
+						msg('printerConnectionTimeout', 'Could not connect to printer. Make sure it is turned on and in range.'),
+					);
+					await withTimeout(
+						probeBleConnection(),
+						8000,
+						msg('printerProbeTimeout', 'Printer connected but did not respond. It may be off or out of paper.'),
+					);
+				} catch (connErr) {
+					// Best-effort cleanup of any dangling GATT connection before propagating.
+					try { await resetBleConnection(); } catch (_) {}
+					throw connErr;
+				}
 
 				const nextName = String(hit?.device_name || hit?.name || name || msg('printerDefaultName', 'Printer'));
 				setSavedPrinterMac(deviceMac);
@@ -573,6 +617,8 @@ const PrintPreviewScreen = () => {
 				return { ok: true, device: hit, mac: deviceMac, name: nextName };
 			} catch (e) {
 				console.warn('[print-preview] connect saved printer error', e);
+				// Ensure native BLE state is cleaned up so next attempt starts fresh.
+				try { await resetBleConnection(); } catch (_) {}
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(
 					msgWith('invalidConnection', 'Invalid connection: {{error}}', { error: String(e?.message || e) }),
@@ -615,14 +661,27 @@ const PrintPreviewScreen = () => {
 	const onPressReconnectPrinter = useCallback(async () => {
 		if (isPrinting) return;
 		setIsReconnectingPrinter(true);
-		const result = await connectToSavedPrinter({ openPickerOnMissing: true });
-		if (result?.ok) {
+		try {
+			const result = await connectToSavedPrinter({ openPickerOnMissing: true });
+			if (result?.ok) {
+				Alert.alert(
+					msg('printerReconnectedTitle', 'Printer'),
+					msg('printerReconnectedMessage', 'Printer connection has been restored.'),
+				);
+			}
+		} catch (e) {
+			console.warn('[print-preview] reconnect error', e);
+			setPrinterConnectionStatus('disconnected');
+			setPrinterConnectionMessage(String(e?.message || e));
 			Alert.alert(
-				msg('printerReconnectedTitle', 'Printer'),
-				msg('printerReconnectedMessage', 'Printer connection has been restored.'),
+				msg('printTitle', 'Print'),
+				msg('printerOffOrOutOfRange', '⚠️ Could not reach the printer.\n\nMake sure the printer is turned on and within Bluetooth range, then try again.'),
+				[{ text: msg('ok', 'OK'), style: 'default' }],
+				{ cancelable: true },
 			);
+		} finally {
+			setIsReconnectingPrinter(false);
 		}
-		setIsReconnectingPrinter(false);
 	}, [connectToSavedPrinter, isPrinting, msg]);
 
 	const printerStatusText = useMemo(() => {
@@ -760,11 +819,22 @@ const PrintPreviewScreen = () => {
 				console.warn('[print-preview] print error', e);
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
+				const errMsg = String(e?.message || e);
+				const isPrinterOff =
+					errMsg.toLowerCase().includes('timeout') ||
+					errMsg.toLowerCase().includes('timed out') ||
+					errMsg.toLowerCase().includes('gatt') ||
+					errMsg.toLowerCase().includes('133') || // Android GATT_ERROR code
+					errMsg.toLowerCase().includes('connect');
 				Alert.alert(
 					msg('printTitle', 'Print'),
-					msgWith('printErrorMessage', 'Print error: {{error}}\n\nIf the printer is Bluetooth Classic (SPP), BLE scan will not detect it.', {
-						error: String(e?.message || e),
-					}),
+					isPrinterOff
+						? msg('printerOffOrOutOfRange', '⚠️ Could not reach the printer.\n\nMake sure the printer is turned on, has paper, and is within Bluetooth range, then try again.')
+						: msgWith('printErrorMessage', 'Print error: {{error}}\n\nIf the printer is Bluetooth Classic (SPP), BLE scan will not detect it.', {
+								error: errMsg,
+						  }),
+					[{ text: msg('ok', 'OK'), style: 'default' }],
+					{ cancelable: true },
 				);
 			}
 			finally {
@@ -775,6 +845,19 @@ const PrintPreviewScreen = () => {
 		run();
 	}, [connectToSavedPrinter, data?.printed_nota, maxDots, msg, msgWith, printTemplate]);
 
+	const onForgetSavedPrinter = useCallback(async () => {
+		await removeValueAsync(STORAGE_KEYS.bleMac);
+		await removeValueAsync(STORAGE_KEYS.bleName);
+		setSavedPrinterMac(null);
+		setSavedPrinterName('');
+		setPrinterConnectionStatus('disconnected');
+		setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
+		Alert.alert(
+			msg('printerReconnectedTitle', 'Printer'),
+			msg('savedPrinterDeleted', 'Saved printer was removed.'),
+		);
+	}, [msg]);
+
 	const onRefreshBleDevices = useCallback(async () => {
 		setBleError(null);
 		setBleLoading(true);
@@ -783,8 +866,16 @@ const PrintPreviewScreen = () => {
 				const ok = await ensureAndroidBluetoothPermissions();
 				if (!ok) throw new Error('BLUETOOTH_CONNECT / SCAN not granted');
 			}
-			await BLEPrinter.init();
-			const list = await BLEPrinter.getDeviceList();
+			await withTimeout(
+				BLEPrinter.init(),
+				8000,
+				'Bluetooth adapter did not respond. Make sure Bluetooth is enabled.',
+			);
+			const list = await withTimeout(
+				BLEPrinter.getDeviceList(),
+				10000,
+				'Bluetooth scan timed out.',
+			);
 			setBleDevices(Array.isArray(list) ? list : []);
 		} catch (e) {
 			console.warn('[print-preview] refresh BLE devices error', e);
@@ -824,8 +915,21 @@ const PrintPreviewScreen = () => {
 				setSavedPrinterMac(String(mac));
 				setSavedPrinterName(String(name || msg('printerDefaultName', 'Printer')));
 				const COMMANDS = THERMAL_COMMANDS;
-				await BLEPrinter.init();
-				await BLEPrinter.connectPrinter(String(mac));
+				try {
+					await withTimeout(
+						BLEPrinter.init(),
+						8000,
+						'Bluetooth adapter did not respond. Make sure Bluetooth is enabled.',
+					);
+					await withTimeout(
+						BLEPrinter.connectPrinter(String(mac)),
+						12000,
+						'Could not connect to printer. Make sure it is turned on and in range.',
+					);
+				} catch (connErr) {
+					try { await resetBleConnection(); } catch (_) {}
+					throw connErr;
+				}
 				setPrinterConnectionStatus('connected');
 				setPrinterConnectionMessage(
 					msgWith('connectedToPrinter', 'Connected: {{name}}', {
@@ -882,12 +986,26 @@ const PrintPreviewScreen = () => {
 				console.warn('[print-preview] pick+print error', e);
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
-				Alert.alert(msg('printTitle', 'Print'), `Error: ${String(e?.message || e)}`);
+				const errMsg = String(e?.message || e);
+				const isPrinterOff =
+					errMsg.toLowerCase().includes('timeout') ||
+					errMsg.toLowerCase().includes('timed out') ||
+					errMsg.toLowerCase().includes('gatt') ||
+					errMsg.toLowerCase().includes('133') ||
+					errMsg.toLowerCase().includes('connect');
+				Alert.alert(
+					msg('printTitle', 'Print'),
+					isPrinterOff
+						? msg('printerOffOrOutOfRange', '⚠️ Could not reach the printer.\n\nMake sure the printer is turned on, has paper, and is within Bluetooth range, then try again.')
+						: `${errMsg}`,
+					[{ text: msg('ok', 'OK'), style: 'default' }],
+					{ cancelable: true },
+				);
 			} finally {
 				setIsPrinting(false);
 			}
 		},
-		[maxDots, msg, msgWith, printTemplate],
+		[maxDots, msg, msgWith, printTemplate, resetBleConnection],
 	);
 
 	if (!data) {
@@ -921,6 +1039,15 @@ const PrintPreviewScreen = () => {
 					headerTintColor: purple,
 					statusBarColor: lightOrange,
 					statusBarStyle: 'dark',
+					headerRight: () => (
+						<Pressable
+							onPress={() => setPrinterModalOpen(true)}
+							hitSlop={10}
+							style={{ marginRight: 12, padding: 4 }}
+						>
+							<Ionicons name="print-outline" size={24} color={purple} />
+						</Pressable>
+					),
 				}}
 			/>
 			<Modal
@@ -930,68 +1057,108 @@ const PrintPreviewScreen = () => {
 				onRequestClose={() => setPrinterModalOpen(false)}
 			>
 				<View style={styles.modalBackdrop}>
+					<Pressable style={StyleSheet.absoluteFill} onPress={() => setPrinterModalOpen(false)} />
 					<View style={styles.modalCard}>
 						<View style={styles.modalHeader}>
-						<View style={styles.modalHeaderDecorL} />
-						<View style={styles.modalHeaderDecorR} />
-						<CustomTextBold style={styles.modalTitle}>{msg('selectPrinterBle', 'Select printer (BLE)')}</CustomTextBold>
-						<Pressable onPress={() => setPrinterModalOpen(false)} hitSlop={10} style={styles.modalCloseBtn}>
-							<Text style={styles.modalClose}>✕</Text>
-						</Pressable>
-					</View>
-
-					<Text style={styles.modalHint}>
-						{msg('classicBluetoothHint', 'If your printer is Bluetooth Classic (SPP) (e.g. many Datecs DPP models), it will not appear here.')}
-					</Text>
-						{bleError ? <Text style={styles.modalError}>{bleError}</Text> : null}
-
-						<View style={styles.modalActions}>
-							<Pressable
-								onPress={onRefreshBleDevices}
-								style={({ pressed }) => [styles.modalButton, pressed && styles.modalButtonPressed]}
-								disabled={bleLoading}
-							>
-								<Text style={styles.modalButtonText}>{bleLoading ? msg('searching', 'Searching...') : msg('reloadList', 'Reload list')}</Text>
-							</Pressable>
-							<Pressable
-								onPress={async () => {
-									await removeValueAsync(STORAGE_KEYS.bleMac);
-									await removeValueAsync(STORAGE_KEYS.bleName);
-									Alert.alert(
-										msg('printerReconnectedTitle', 'Printer'),
-										msg('savedPrinterDeleted', 'Saved printer was removed.'),
-									);
-								}}
-								style={({ pressed }) => [styles.modalButtonSecondary, pressed && styles.modalButtonPressed]}
-							>
-								<Text style={styles.modalButtonSecondaryText}>{msg('deleteSavedPrinter', 'Delete saved printer')}</Text>
+							<View style={styles.modalHeaderDecorL} />
+							<View style={styles.modalHeaderDecorR} />
+							<View style={styles.modalHeaderIconWrap}>
+								<Ionicons name="bluetooth" size={resize(15)} color={white} />
+							</View>
+							<CustomTextBold style={styles.modalTitle}>{msg('selectPrinterBle', 'Select Bluetooth Printer')}</CustomTextBold>
+							<Pressable onPress={() => setPrinterModalOpen(false)} hitSlop={10} style={styles.modalCloseBtn}>
+								<Ionicons name="close" size={resize(15)} color={white} />
 							</Pressable>
 						</View>
 
-						<FlatList
-							data={bleDevices}
-							keyExtractor={(item, idx) =>
-								String(item?.inner_mac_address || item?.macAddress || item?.mac || item?.address || idx)
-							}
-							renderItem={({ item }) => {
-								const name = item?.device_name || item?.name || msg('printerDefaultName', 'Printer');
-								const mac = item?.inner_mac_address || item?.macAddress || item?.mac || item?.address;
-								return (
+						<Text style={styles.modalHint}>
+							{msg('classicBluetoothHint', 'Bluetooth Classic (SPP) printers (e.g. Datecs DPP) will not appear in this list.')}
+						</Text>
+
+						{savedPrinterMac ? (
+							<View style={styles.savedPrinterSection}>
+								<CustomTextMedium style={styles.sectionLabel}>{msg('savedPrinterLabel', 'Saved printer')}</CustomTextMedium>
+								<View style={styles.savedPrinterCard}>
+									<View style={styles.savedPrinterIconWrap}>
+										<Ionicons name="print" size={resize(18)} color={purple} />
+									</View>
+									<View style={styles.savedPrinterInfo}>
+										<CustomTextBold style={styles.savedPrinterName}>{savedPrinterName || msg('printerDefaultName', 'Printer')}</CustomTextBold>
+										<Text style={styles.savedPrinterMacText}>{savedPrinterMac}</Text>
+									</View>
 									<Pressable
-										onPress={() => onPickBleDevice(item)}
-										style={({ pressed }) => [styles.deviceRow, pressed && styles.deviceRowPressed]}
-										disabled={isPrinting}
+										onPress={onForgetSavedPrinter}
+										hitSlop={10}
+										style={({ pressed }) => [styles.forgetBtn, pressed && { opacity: 0.6 }]}
 									>
-										<Text style={styles.deviceName}>{String(name)}</Text>
-										<Text style={styles.deviceMac}>{String(mac || '')}</Text>
+										<Ionicons name="trash-outline" size={resize(17)} color={red} />
 									</Pressable>
-								);
-							}}
-							ListEmptyComponent={
-								bleLoading ? null : <Text style={styles.modalEmpty}>{msg('noBlePrintersFound', 'No BLE printers found.')}</Text>
-							}
-							contentContainerStyle={{ paddingTop: resize(10), paddingBottom: resize(16) }}
-						/>
+								</View>
+							</View>
+						) : null}
+
+						{bleError ? <Text style={styles.modalError}>{bleError}</Text> : null}
+
+						<View style={styles.devicesSection}>
+							<View style={styles.devicesSectionHeader}>
+								<CustomTextMedium style={styles.sectionLabel}>{msg('availableDevices', 'Available devices')}</CustomTextMedium>
+								<Pressable
+									onPress={onRefreshBleDevices}
+									disabled={bleLoading}
+									style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.8 }]}
+								>
+									{bleLoading
+										? <ActivityIndicator size={resize(13)} color={purple} style={{ marginRight: resize(4) }} />
+										: <Ionicons name="refresh-outline" size={resize(14)} color={purple} style={{ marginRight: resize(4) }} />
+									}
+									<Text style={styles.scanBtnText}>{bleLoading ? msg('searching', 'Scanning...') : msg('reloadList', 'Scan')}</Text>
+								</Pressable>
+							</View>
+
+							<FlatList
+								data={bleDevices}
+								keyExtractor={(item, idx) =>
+									String(item?.inner_mac_address || item?.macAddress || item?.mac || item?.address || idx)
+								}
+								renderItem={({ item }) => {
+									const name = item?.device_name || item?.name || msg('printerDefaultName', 'Printer');
+									const mac = item?.inner_mac_address || item?.macAddress || item?.mac || item?.address;
+									const isSaved = savedPrinterMac && String(mac || '').toLowerCase() === String(savedPrinterMac).toLowerCase();
+									return (
+										<Pressable
+											onPress={() => onPickBleDevice(item)}
+											style={({ pressed }) => [styles.deviceRow, isSaved && styles.deviceRowSaved, pressed && styles.deviceRowPressed]}
+											disabled={isPrinting}
+										>
+											<View style={[styles.deviceIconWrap, isSaved && styles.deviceIconWrapSaved]}>
+												<Ionicons name="bluetooth" size={resize(15)} color={isSaved ? white : purple} />
+											</View>
+											<View style={styles.deviceInfo}>
+												<CustomTextBold style={[styles.deviceName, isSaved && styles.deviceNameSaved]}>{String(name)}</CustomTextBold>
+												<Text style={[styles.deviceMac, isSaved && styles.deviceMacSaved]}>{String(mac || '')}</Text>
+											</View>
+											{isSaved
+												? <View style={styles.deviceCheck}><Ionicons name="checkmark-circle" size={resize(18)} color={purple} /></View>
+												: <Ionicons name="chevron-forward" size={resize(15)} color={gray} />
+											}
+										</Pressable>
+									);
+								}}
+								ListEmptyComponent={
+									bleLoading
+										? <View style={styles.scanningState}>
+											<ActivityIndicator size="large" color={purple} />
+											<Text style={styles.scanningText}>{msg('searchingForDevices', 'Searching for devices...')}</Text>
+										</View>
+										: <View style={styles.emptyState}>
+											<Ionicons name="bluetooth-outline" size={resize(36)} color={gray} />
+											<Text style={styles.modalEmpty}>{msg('noBlePrintersFound', 'No BLE printers found.')}</Text>
+											<Text style={styles.modalEmptyHint}>{msg('tapScanToSearch', 'Tap "Scan" to search for nearby printers.')}</Text>
+										</View>
+								}
+								contentContainerStyle={{ paddingBottom: resize(24) }}
+							/>
+						</View>
 					</View>
 				</View>
 			</Modal>
@@ -1117,11 +1284,11 @@ const PrintPreviewScreen = () => {
 					</Pressable>
 				<Pressable
 					onPress={onPressPrint}
-					disabled={isPrinting}
+					disabled={isPrinting || printerConnectionStatus !== 'connected'}
 					style={({ pressed }) => [
 						styles.printButton,
-						pressed && styles.printButtonPressed,
-						isPrinting && styles.printButtonDisabled,
+						pressed && printerConnectionStatus === 'connected' && styles.printButtonPressed,
+						(isPrinting || printerConnectionStatus !== 'connected') && styles.printButtonDisabled,
 					]}
 					hitSlop={8}
 				>
@@ -1249,24 +1416,25 @@ const styles = StyleSheet.create({
 	},
 	modalBackdrop: {
 		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.2)',
+		backgroundColor: 'rgba(0,0,0,0.45)',
 		justifyContent: 'flex-end',
 	},
 	modalCard: {
-		backgroundColor: lightOrange,
-		borderTopLeftRadius: resize(24),
-		borderTopRightRadius: resize(24),
+		backgroundColor: '#F8F4FF',
+		borderTopLeftRadius: resize(28),
+		borderTopRightRadius: resize(28),
 		overflow: 'hidden',
-		maxHeight: '80%',
+		maxHeight: '88%',
+		flex: 1,
 	},
 	modalHeader: {
 		backgroundColor: purple,
-		paddingTop: resize(18),
-		paddingBottom: resize(16),
-		paddingHorizontal: resize(18),
+		paddingTop: resize(14),
+		paddingBottom: resize(14),
+		paddingHorizontal: resize(16),
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'space-between',
+		gap: resize(10),
 		overflow: 'hidden',
 	},
 	modalHeaderDecorL: {
@@ -1287,6 +1455,14 @@ const styles = StyleSheet.create({
 		top: -resize(15),
 		right: resize(60),
 	},
+	modalHeaderIconWrap: {
+		width: resize(30),
+		height: resize(30),
+		borderRadius: resize(15),
+		backgroundColor: 'rgba(255,255,255,0.18)',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	modalTitle: {
 		...general.fontSize14,
 		color: white,
@@ -1295,90 +1471,182 @@ const styles = StyleSheet.create({
 	modalCloseBtn: {
 		backgroundColor: 'rgba(255,255,255,0.2)',
 		borderRadius: resize(20),
-		padding: resize(6),
-	},
-	modalClose: {
-		fontSize: resize(14),
-		color: white,
-		lineHeight: resize(16),
+		padding: resize(7),
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	modalHint: {
-		...general.fontSize9,
+		...general.fontSize8,
 		color: gray,
-		margin: resize(14),
-		marginBottom: resize(6),
+		marginHorizontal: resize(16),
+		marginTop: resize(12),
+		marginBottom: resize(4),
+		lineHeight: resize(14),
 	},
 	modalError: {
-		...general.fontSize9,
+		...general.fontSize8,
 		color: red,
-		marginHorizontal: resize(14),
+		marginHorizontal: resize(16),
 		marginBottom: resize(8),
 	},
-	modalActions: {
-		flexDirection: 'row',
-		gap: resize(10),
-		marginHorizontal: resize(14),
-		marginBottom: resize(10),
+	savedPrinterSection: {
+		marginHorizontal: resize(16),
+		marginTop: resize(14),
+		marginBottom: resize(4),
 	},
-	modalButton: {
-		flex: 1,
-		height: resize(40),
-		borderRadius: resize(12),
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: purple,
+	sectionLabel: {
+		...general.fontSize8,
+		color: gray,
+		marginBottom: resize(6),
+		letterSpacing: 0.6,
 	},
-	modalButtonSecondary: {
-		flex: 1,
-		height: resize(40),
-		borderRadius: resize(12),
-		alignItems: 'center',
-		justifyContent: 'center',
+	savedPrinterCard: {
 		backgroundColor: white,
+		borderRadius: resize(16),
+		paddingVertical: resize(12),
+		paddingHorizontal: resize(14),
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderWidth: 1.5,
+		borderColor: purple,
+		shadowColor: purple,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.10,
+		shadowRadius: 6,
+		elevation: 3,
+	},
+	savedPrinterIconWrap: {
+		width: resize(38),
+		height: resize(38),
+		borderRadius: resize(19),
+		backgroundColor: lightOrange,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: resize(12),
+	},
+	savedPrinterInfo: {
+		flex: 1,
+	},
+	savedPrinterName: {
+		...general.fontSize12,
+		color: black,
+	},
+	savedPrinterMacText: {
+		...general.fontSize8,
+		color: gray,
+		marginTop: resize(2),
+	},
+	forgetBtn: {
+		padding: resize(8),
+		borderRadius: resize(10),
+		backgroundColor: 'rgba(220,53,69,0.09)',
+	},
+	devicesSection: {
+		flex: 1,
+		marginTop: resize(14),
+	},
+	devicesSectionHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginHorizontal: resize(16),
+		marginBottom: resize(8),
+	},
+	scanBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: resize(12),
+		paddingVertical: resize(6),
+		borderRadius: resize(20),
+		backgroundColor: lightOrange,
 		borderWidth: 1,
 		borderColor: purple,
 	},
-	modalButtonPressed: {
-		opacity: 0.85,
-	},
-	modalButtonText: {
-		color: white,
+	scanBtnText: {
 		...general.fontSize10,
-	},
-	modalButtonSecondaryText: {
 		color: purple,
-		...general.fontSize10,
 	},
 	deviceRow: {
 		backgroundColor: white,
-		borderRadius: resize(12),
-		paddingVertical: resize(12),
+		borderRadius: resize(14),
+		paddingVertical: resize(10),
 		paddingHorizontal: resize(14),
-		marginHorizontal: resize(14),
+		marginHorizontal: resize(16),
 		marginBottom: resize(8),
+		flexDirection: 'row',
+		alignItems: 'center',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
-		shadowRadius: 3,
+		shadowRadius: 4,
 		elevation: 1,
 	},
+	deviceRowSaved: {
+		borderWidth: 1.5,
+		borderColor: purple,
+		backgroundColor: lightOrange,
+	},
 	deviceRowPressed: {
-		opacity: 0.8,
+		opacity: 0.75,
+	},
+	deviceIconWrap: {
+		width: resize(34),
+		height: resize(34),
+		borderRadius: resize(17),
+		backgroundColor: lightOrange,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: resize(12),
+	},
+	deviceIconWrapSaved: {
+		backgroundColor: purple,
+	},
+	deviceInfo: {
+		flex: 1,
 	},
 	deviceName: {
 		...general.fontSize12,
 		color: black,
 	},
+	deviceNameSaved: {
+		color: purple,
+	},
 	deviceMac: {
-		...general.fontSize9,
+		...general.fontSize8,
 		color: gray,
 		marginTop: resize(2),
 	},
+	deviceMacSaved: {
+		color: purple,
+		opacity: 0.7,
+	},
+	deviceCheck: {
+		marginLeft: resize(6),
+	},
+	scanningState: {
+		alignItems: 'center',
+		paddingVertical: resize(32),
+		gap: resize(12),
+	},
+	scanningText: {
+		...general.fontSize10,
+		color: gray,
+	},
+	emptyState: {
+		alignItems: 'center',
+		paddingVertical: resize(28),
+		gap: resize(8),
+	},
 	modalEmpty: {
-		paddingVertical: resize(20),
 		textAlign: 'center',
 		color: gray,
 		...general.fontSize10,
+	},
+	modalEmptyHint: {
+		textAlign: 'center',
+		color: gray,
+		...general.fontSize8,
+		opacity: 0.75,
 	},
 	meta: {
 		width: '100%',

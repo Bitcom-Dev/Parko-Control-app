@@ -1,0 +1,285 @@
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNBLEPrinterModule.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNBLEPrinterModule.java
+index f83cb65..4bdaf6b 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNBLEPrinterModule.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNBLEPrinterModule.java
+@@ -82,10 +82,10 @@ public class RNBLEPrinterModule extends ReactContextBaseJavaModule implements RN
+ 
+     @ReactMethod
+     @Override
+-    public void printImageBase64(String base64, int imageWidth, int imageHeight, Callback errorCallback) {
++    public void printImageBase64(String base64, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
+         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+-        adapter.printImageBase64(decodedByte, imageWidth, imageHeight,errorCallback);
++        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, alignment, errorCallback);
+     }
+ 
+     @ReactMethod
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNNetPrinterModule.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNNetPrinterModule.java
+index 36749f8..649affb 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNNetPrinterModule.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNNetPrinterModule.java
+@@ -75,12 +75,12 @@ public class RNNetPrinterModule extends ReactContextBaseJavaModule implements RN
+ 
+     @ReactMethod
+     @Override
+-    public void printImageBase64(String base64, int imageWidth, int imageHeight, Callback errorCallback) {
++    public void printImageBase64(String base64, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         // String imageBase64 = "data:image/png;base64," + imageUrl;
+         // String base64ImageProcessed = imageUrl.split(",")[1];
+         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
+         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+-        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, errorCallback);
++        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, alignment, errorCallback);
+     }
+ 
+     @Override
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNPrinterModule.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNPrinterModule.java
+index 4e0ab1c..ce3c081 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNPrinterModule.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNPrinterModule.java
+@@ -21,6 +21,6 @@ public interface RNPrinterModule {
+     public void printImageData(String imageUrl, int imageWidth, int imageHeight, Callback errorCallback);
+ 
+     @ReactMethod
+-    public void printImageBase64(String base64, int imageWidth, int imageHeight, Callback errorCallback) ;
++    public void printImageBase64(String base64, int imageWidth, int imageHeight, int alignment, Callback errorCallback) ;
+ }
+ 
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNUSBPrinterModule.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNUSBPrinterModule.java
+index 6ea5fa8..752ec97 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNUSBPrinterModule.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/RNUSBPrinterModule.java
+@@ -77,12 +77,12 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
+ 
+     @ReactMethod
+     @Override
+-    public void printImageBase64(String base64, int imageWidth, int imageHeight, Callback errorCallback) {
++    public void printImageBase64(String base64, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         // String imageBase64 = "data:image/png;base64," + imageUrl;
+         // String base64ImageProcessed = imageUrl.split(",")[1];
+         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
+         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+-        adapter.printImageBase64(decodedByte, imageWidth, imageHeight,errorCallback);
++        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, alignment, errorCallback);
+     }
+ 
+     @ReactMethod
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/BLEPrinterAdapter.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/BLEPrinterAdapter.java
+index 9d77969..90ee7c5 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/BLEPrinterAdapter.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/BLEPrinterAdapter.java
+@@ -131,14 +131,16 @@ public class BLEPrinterAdapter implements PrinterAdapter{
+                     connectBluetoothDevice(device, false);
+                     successCallback.invoke(new BLEPrinterDevice(this.mBluetoothDevice).toRNWritableMap());
+                     return;
+-                } catch (IOException e) {
++                } catch (Exception e) {
++                    closeConnectionIfExists();
+                     try {
+                         connectBluetoothDevice(device, true);
+                         successCallback.invoke(new BLEPrinterDevice(this.mBluetoothDevice).toRNWritableMap());
+                         return;
+-                    } catch (IOException er) {
++                    } catch (Exception er) {
++                        closeConnectionIfExists();
+                         er.printStackTrace();
+-                        errorCallback.invoke(er.getMessage());
++                        errorCallback.invoke("Failed to connect to printer: " + er.getMessage());
+                         return;
+                     }
+                 }
+@@ -159,7 +161,9 @@ public class BLEPrinterAdapter implements PrinterAdapter{
+                         .getMethod("createRfcommSocket", new Class[] { int.class }).invoke(device, 1);
+             } catch (Exception e) {
+                 e.printStackTrace();
++                throw new IOException("Failed to create fallback socket: " + e.getMessage());
+             }
++            this.mBluetoothSocket.connect();
+         } else {
+             this.mBluetoothSocket = device.createInsecureRfcommSocketToServiceRecord(uuid);
+             this.mBluetoothSocket.connect();
+@@ -276,11 +280,13 @@ public class BLEPrinterAdapter implements PrinterAdapter{
+         } catch (IOException e) {
+             Log.e(LOG_TAG, "failed to print data");
+             e.printStackTrace();
++            closeConnectionIfExists();
++            errorCallback.invoke("Print failed: " + e.getMessage());
+         }
+     }
+ 
+     @Override
+-    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight,Callback errorCallback) {
++    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         if(bitmapImage == null) {
+             errorCallback.invoke("image not found");
+             return;
+@@ -298,23 +304,24 @@ public class BLEPrinterAdapter implements PrinterAdapter{
+ 
+             OutputStream printerOutputStream = socket.getOutputStream();
+ 
++            byte[] alignCmd = new byte[]{ 0x1B, 0x61, (byte)(0x30 + (alignment & 0x03)) };
+             printerOutputStream.write(SET_LINE_SPACE_24);
+-            printerOutputStream.write(CENTER_ALIGN);
++            printerOutputStream.flush();
+ 
+             for (int y = 0; y < pixels.length; y += 24) {
+-                // Like I said before, when done sending data,
+-                // the printer will resume to normal text printing
+-                printerOutputStream.write(SELECT_BIT_IMAGE_MODE);
+-                // Set nL and nH based on the width of the image
+-                printerOutputStream.write(new byte[]{(byte)(0x00ff & pixels[y].length)
+-                        , (byte)((0xff00 & pixels[y].length) >> 8)});
+-                for (int x = 0; x < pixels[y].length; x++) {
+-                    // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
+-                    printerOutputStream.write(recollectSlice(y, x, pixels));
++                // Build entire band as one buffer: align + image header + pixel data + LF
++                int bandWidth = pixels[y].length;
++                ByteArrayOutputStream bandBuf = new ByteArrayOutputStream(
++                        alignCmd.length + SELECT_BIT_IMAGE_MODE.length + 2 + bandWidth * 3 + 1);
++                bandBuf.write(alignCmd);
++                bandBuf.write(SELECT_BIT_IMAGE_MODE);
++                bandBuf.write(new byte[]{(byte)(0x00ff & bandWidth), (byte)((0xff00 & bandWidth) >> 8)});
++                for (int x = 0; x < bandWidth; x++) {
++                    bandBuf.write(recollectSlice(y, x, pixels));
+                 }
+-
+-                // Do a line feed, if not the printing will resume on the same line
+-                printerOutputStream.write(LINE_FEED);
++                bandBuf.write(LINE_FEED);
++                printerOutputStream.write(bandBuf.toByteArray());
++                printerOutputStream.flush();
+             }
+             printerOutputStream.write(SET_LINE_SPACE_32);
+             printerOutputStream.write(LINE_FEED);
+@@ -323,6 +330,8 @@ public class BLEPrinterAdapter implements PrinterAdapter{
+         } catch (IOException e) {
+             Log.e(LOG_TAG, "failed to print data");
+             e.printStackTrace();
++            closeConnectionIfExists();
++            errorCallback.invoke("Print failed: " + e.getMessage());
+         }
+     }
+ }
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/NetPrinterAdapter.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/NetPrinterAdapter.java
+index e811a33..853e44b 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/NetPrinterAdapter.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/NetPrinterAdapter.java
+@@ -306,7 +306,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
+     }
+ 
+     @Override
+-    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, Callback errorCallback) {
++    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         if (bitmapImage == null) {
+             errorCallback.invoke("image not found");
+             return;
+@@ -324,23 +324,24 @@ public class NetPrinterAdapter implements PrinterAdapter {
+ 
+             OutputStream printerOutputStream = socket.getOutputStream();
+ 
++            byte[] alignCmd = new byte[]{ 0x1B, 0x61, (byte)(0x30 + (alignment & 0x03)) };
+             printerOutputStream.write(SET_LINE_SPACE_24);
+-            printerOutputStream.write(CENTER_ALIGN);
++            printerOutputStream.flush();
+ 
+             for (int y = 0; y < pixels.length; y += 24) {
+-                // Like I said before, when done sending data,
+-                // the printer will resume to normal text printing
+-                printerOutputStream.write(SELECT_BIT_IMAGE_MODE);
+-                // Set nL and nH based on the width of the image
+-                printerOutputStream.write(new byte[]{(byte) (0x00ff & pixels[y].length)
+-                        , (byte) ((0xff00 & pixels[y].length) >> 8)});
+-                for (int x = 0; x < pixels[y].length; x++) {
+-                    // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
+-                    printerOutputStream.write(recollectSlice(y, x, pixels));
++                // Build entire band as one buffer: align + image header + pixel data + LF
++                int bandWidth = pixels[y].length;
++                ByteArrayOutputStream bandBuf = new ByteArrayOutputStream(
++                        alignCmd.length + SELECT_BIT_IMAGE_MODE.length + 2 + bandWidth * 3 + 1);
++                bandBuf.write(alignCmd);
++                bandBuf.write(SELECT_BIT_IMAGE_MODE);
++                bandBuf.write(new byte[]{(byte)(0x00ff & bandWidth), (byte)((0xff00 & bandWidth) >> 8)});
++                for (int x = 0; x < bandWidth; x++) {
++                    bandBuf.write(recollectSlice(y, x, pixels));
+                 }
+-
+-                // Do a line feed, if not the printing will resume on the same line
+-                printerOutputStream.write(LINE_FEED);
++                bandBuf.write(LINE_FEED);
++                printerOutputStream.write(bandBuf.toByteArray());
++                printerOutputStream.flush();
+             }
+             printerOutputStream.write(SET_LINE_SPACE_32);
+             printerOutputStream.write(LINE_FEED);
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/PrinterAdapter.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/PrinterAdapter.java
+index 7223830..6e6b52d 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/PrinterAdapter.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/PrinterAdapter.java
+@@ -29,5 +29,5 @@ public interface PrinterAdapter {
+ 
+     public void printImageData(String imageUrl, int imageWidth, int imageHeight, Callback errorCallback);
+ 
+-    public void printImageBase64(Bitmap imageUrl, int imageWidth, int imageHeight, Callback errorCallback);
++    public void printImageBase64(Bitmap imageUrl, int imageWidth, int imageHeight, int alignment, Callback errorCallback);
+ }
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/USBPrinterAdapter.java b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/USBPrinterAdapter.java
+index f5089b2..4b8aa17 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/USBPrinterAdapter.java
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/android/src/main/java/com/pinmi/react/printer/adapter/USBPrinterAdapter.java
+@@ -314,7 +314,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
+     }
+ 
+     @Override
+-    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, Callback errorCallback) {
++    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int alignment, Callback errorCallback) {
+         if (bitmapImage == null) {
+             errorCallback.invoke("image not found");
+             return;
+@@ -328,9 +328,11 @@ public class USBPrinterAdapter implements PrinterAdapter {
+ 
+             int b = mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_24, SET_LINE_SPACE_24.length, 100000);
+ 
+-            b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
++            byte[] alignCmd = new byte[]{ 0x1B, 0x61, (byte)(0x30 + (alignment & 0x03)) };
+ 
+             for (int y = 0; y < pixels.length; y += 24) {
++                // Re-send alignment before each band so LINE_FEED doesn't reset it
++                mUsbDeviceConnection.bulkTransfer(mEndPoint, alignCmd, alignCmd.length, 100000);
+                 // Like I said before, when done sending data,
+                 // the printer will resume to normal text printing
+                 mUsbDeviceConnection.bulkTransfer(mEndPoint, SELECT_BIT_IMAGE_MODE, SELECT_BIT_IMAGE_MODE.length, 100000);
+diff --git a/node_modules/react-native-thermal-receipt-printer-image-qr/dist/index.js b/node_modules/react-native-thermal-receipt-printer-image-qr/dist/index.js
+index f614d98..cad1dd7 100644
+--- a/node_modules/react-native-thermal-receipt-printer-image-qr/dist/index.js
++++ b/node_modules/react-native-thermal-receipt-printer-image-qr/dist/index.js
+@@ -338,6 +338,9 @@ var USBPrinter = {
+           null && _b !== void 0
+           ? _b
+           : 0,
++        (opts === null || opts === void 0 ? void 0 : opts.alignment) != null
++          ? opts.alignment
++          : 1,
+         function (error) {
+           return console.warn(error);
+         }
+@@ -537,6 +540,9 @@ var BLEPrinter = {
+           null && _b !== void 0
+           ? _b
+           : 0,
++        (opts === null || opts === void 0 ? void 0 : opts.alignment) != null
++          ? opts.alignment
++          : 1,
+         function (error) {
+           return console.warn(error);
+         }
+@@ -771,6 +777,9 @@ var NetPrinter = {
+           null && _b !== void 0
+           ? _b
+           : 0,
++        (opts === null || opts === void 0 ? void 0 : opts.alignment) != null
++          ? opts.alignment
++          : 1,
+         function (error) {
+           return console.warn(error);
+         }
