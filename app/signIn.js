@@ -81,12 +81,11 @@ const SignIn = () => {
 				{/* Form card */}
 				<View style={styles.formCard}>
 					<CustomTextBold style={styles.formTitle}>{strings.login}</CustomTextBold>
-					<CustomTextRegular style={styles.formSubtitle}>{strings.username}</CustomTextRegular>
 
 					<CustomTextInputFloating
 						value={username}
 						onChangeText={setUsername}
-						style={{ ...general.fontSize10, width: '100%', marginTop: resize(8) }}
+						style={{ ...general.fontSize10, width: '100%', marginTop: resize(20) }}
 						styleTextInput={{ ...general.fontSize10, color: black }}
 						selectionColor={purple}
 						label={strings.username}
@@ -102,7 +101,7 @@ const SignIn = () => {
 						ref={passwordRef}
 						value={password}
 						onChangeText={setPassword}
-						style={{ ...general.fontSize10, width: '100%', marginTop: resize(16) }}
+						style={{ ...general.fontSize10, width: '100%', marginTop: resize(40) }}
 						styleTextInput={{ ...general.fontSize10, color: black }}
 						selectionColor={purple}
 						label={strings.password}

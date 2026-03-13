@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 7.2.0",
-    "npmrc": "legacy-peer-deps=true"
+    "version": ">= 7.2.0"
   },
   "build": {
     "development": {
