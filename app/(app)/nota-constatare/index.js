@@ -262,6 +262,7 @@ const NotaConstatareScreen = () => {
 				.get(`/${selectedViolation.id}/requirements`)
 				.then((response) => {
 					setRequirements(response.data);
+					console.log(response.data);
 					// Initialize form values; prefill + lock when requirement.value exists in selectedViolation
 					const initialValues = {};
 					const initialLocked = {};
@@ -406,7 +407,8 @@ const NotaConstatareScreen = () => {
 
 		(async () => {
 			try {
-				const { lat, long } = await getDeviceCoordinates();
+				const lat = user.location?.latitude;
+				const long = user.location?.longitude;
 				if (cancelled) return;
 
 				const locationLabel = await getLocationLabelFromCoords(lat, long);
@@ -428,7 +430,7 @@ const NotaConstatareScreen = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedViolation?.id, hasLocFaptaRequirement, lockedFields?.LOC_FAPTA, formValues?.LOC_FAPTA, getDeviceCoordinates]);
+	}, [selectedViolation?.id, hasLocFaptaRequirement, lockedFields?.LOC_FAPTA, formValues?.LOC_FAPTA]);
 
 	const requiresPhoto = (() => {
 		const raw = selectedViolation?.requires_photo ?? selectedViolation?.requiresPhoto;
@@ -534,36 +536,6 @@ const NotaConstatareScreen = () => {
 			setPhotoError(strings?.photoLoadError || 'Failed to load photo');
 		}
 	}, [setPhotoAndBind, strings?.photoLoadError]);
-
-	const getDeviceCoordinates = useCallback(async () => {
-		try {
-			const perm = await Location.requestForegroundPermissionsAsync();
-			if (!perm?.granted) {
-				return { lat: null, long: null };
-			}
-			try {
-				const pos = await Location.getCurrentPositionAsync({
-					accuracy: Location.Accuracy.Balanced,
-				});
-				if (pos?.coords?.latitude != null) {
-					return { lat: pos.coords.latitude, long: pos.coords.longitude };
-				}
-			} catch (_) {
-				// getCurrentPositionAsync failed (services off, timeout, etc.) — try last known
-			}
-			try {
-				const last = await Location.getLastKnownPositionAsync();
-				if (last?.coords?.latitude != null) {
-					return { lat: last.coords.latitude, long: last.coords.longitude };
-				}
-			} catch (_) {
-				// no last known position either
-			}
-		} catch (_) {
-			// permission request failed
-		}
-		return { lat: null, long: null };
-	}, []);
 
 	const tryConvertToJpegBase64 = useCallback(async (base64) => {
 		if (!base64) return '';
@@ -871,8 +843,8 @@ const NotaConstatareScreen = () => {
 
 		try {
 			setSubmitting(true);
-
-			const { lat, long } = await getDeviceCoordinates();
+			const lat = user.location?.latitude;
+			const long = user.location?.longitude;
 			const bwPhoto = photoBase64 ? String(photoBase64) : '';
 
 			const source = params?.source || params?.from || params?.origin;
@@ -912,7 +884,7 @@ const NotaConstatareScreen = () => {
 		} finally {
 			setSubmitting(false);
 		}
-	}, [selectedViolation?.id, submitting, requiresPhoto, photoLoading, photoBase64, strings?.error, strings?.addPhoto, getDeviceCoordinates, buildPayloadInTemplateOrder, strings?.loadError, params]);
+	}, [selectedViolation?.id, submitting, requiresPhoto, photoLoading, photoBase64, strings?.error, strings?.addPhoto, buildPayloadInTemplateOrder, strings?.loadError, params]);
 
 	// Handle form value changes
 	const handleValueChange = (key, value) => {
