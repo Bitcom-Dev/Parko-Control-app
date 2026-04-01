@@ -24,7 +24,7 @@ const NotaConstatareScreen = () => {
 
 	const { NotaConstatareScreen: strings } = useMessage();
 	const auth = useAuth();
-	const { user } = useSession();
+	const { user, location } = useSession();
 	const authRef = useRef(auth);
 	const params = useLocalSearchParams();
 	const presetRef = useRef({ enabled: false, code: 'unpaid_parking', lock: true });
@@ -262,7 +262,6 @@ const NotaConstatareScreen = () => {
 				.get(`/${selectedViolation.id}/requirements`)
 				.then((response) => {
 					setRequirements(response.data);
-					console.log(response.data);
 					// Initialize form values; prefill + lock when requirement.value exists in selectedViolation
 					const initialValues = {};
 					const initialLocked = {};
@@ -374,6 +373,17 @@ const NotaConstatareScreen = () => {
 						initialValues.AVERTISMENT = true;
 						initialValues.AMENDA = false;
 					}
+
+					const hasContravenientBoolean = response.data.some(
+						(req) => req?.type === 'BOOLEAN' && req?.value === 'CONTRAVENIENT'
+					);
+					const hasPjBoolean = response.data.some(
+						(req) => req?.type === 'BOOLEAN' && req?.value === 'PJ'
+					);
+					if (hasContravenientBoolean && hasPjBoolean) {
+						initialValues.CONTRAVENIENT = true;
+						initialValues.PJ = false;
+					}
 					setFormValues(initialValues);
 					setLockedFields(initialLocked);
 					setLoadingRequirements(false);
@@ -407,8 +417,8 @@ const NotaConstatareScreen = () => {
 
 		(async () => {
 			try {
-				const lat = user.location?.latitude;
-				const long = user.location?.longitude;
+				const lat = location?.latitude;
+				const long = location?.longitude;
 				if (cancelled) return;
 
 				const locationLabel = await getLocationLabelFromCoords(lat, long);
@@ -821,6 +831,7 @@ const NotaConstatareScreen = () => {
 		upsertPreserveOrder('lat', lat ?? '');
 		upsertPreserveOrder('long', long ?? '');
 		upsertPreserveOrder('POZA_MASINA_BASE64', photoBwBase64 ?? '');
+		upsertPreserveOrder('ORIGINAL_POZA_MASINA_BASE64', photoSourceBase64 ?? '');
 		upsertPreserveOrder('preview', false);
 		if (plateID !== undefined && plateID !== null && String(plateID) !== '') {
 			upsertPreserveOrder('plateID', plateID);
@@ -843,8 +854,8 @@ const NotaConstatareScreen = () => {
 
 		try {
 			setSubmitting(true);
-			const lat = user.location?.latitude;
-			const long = user.location?.longitude;
+			const lat = location?.latitude;
+			const long = location?.longitude;
 			const bwPhoto = photoBase64 ? String(photoBase64) : '';
 
 			const source = params?.source || params?.from || params?.origin;
@@ -868,8 +879,12 @@ const NotaConstatareScreen = () => {
 			const payload = buildPayloadInTemplateOrder(lat, long, bwPhoto, plateID);
 			const res = await notaConstatareInstance(authRef.current)
 				.post(`/${selectedViolation.id}/generate_fine`, payload);
-
-			if (res?.data?.printed_nota) {
+			if (res?.status === 201) {
+				Alert.alert(
+					strings?.registeredTitle || 'Inregistrat',
+					strings?.registeredForProcessing || 'Procesul verbal a fost inregistrat pentru procesare ulterioara, nefiind toate datele complete in acest moment.'
+				);
+			} else if (res?.data?.printed_nota) {
 				setPrintPreview({
 					printed_id: res?.data?.printed_id,
 					printed_nota: String(res?.data?.printed_nota),
@@ -884,7 +899,7 @@ const NotaConstatareScreen = () => {
 		} finally {
 			setSubmitting(false);
 		}
-	}, [selectedViolation?.id, submitting, requiresPhoto, photoLoading, photoBase64, strings?.error, strings?.addPhoto, buildPayloadInTemplateOrder, strings?.loadError, params]);
+	}, [selectedViolation?.id, submitting, requiresPhoto, photoLoading, photoBase64, strings?.error, strings?.addPhoto, buildPayloadInTemplateOrder, strings?.loadError, params, user]);
 
 	// Handle form value changes
 	const handleValueChange = (key, value) => {
@@ -904,6 +919,14 @@ const NotaConstatareScreen = () => {
 
 			if ((key === 'AMENDA' && !Boolean(value)) || (key === 'AVERTISMENT' && Boolean(value))) {
 				next.PUNCTE_AMENDA = 0;
+			}
+
+			const hasContravenient = requirements.some((req) => req?.type === 'BOOLEAN' && req?.value === 'CONTRAVENIENT');
+			const hasPj = requirements.some((req) => req?.type === 'BOOLEAN' && req?.value === 'PJ');
+
+			if (hasContravenient && hasPj) {
+				if (key === 'CONTRAVENIENT') next.PJ = !Boolean(value);
+				if (key === 'PJ') next.CONTRAVENIENT = !Boolean(value);
 			}
 
 			return next;
@@ -1810,6 +1833,7 @@ const styles = {
 		backgroundColor: white,
 		borderRadius: resize(18),
 		...general.shaddowLighter,
+		elevation: 0,
 	},
 	sectionTitle: {
 		...general.fontSize8,
