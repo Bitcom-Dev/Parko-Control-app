@@ -12,9 +12,7 @@
       "resizeMode": "cover",
       "backgroundColor": "#890350"
     },
-    "runtimeVersion": {
-      "policy": "1.2.0"
-    },
+    "runtimeVersion": "1.2.0",
     "assetBundlePatterns": [
       "**/*"
     ],
