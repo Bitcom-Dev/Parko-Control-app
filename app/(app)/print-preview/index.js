@@ -107,6 +107,37 @@ const withTimeout = (promise, ms, message) =>
 		),
 	]);
 
+// Small delay to let the BLE stack settle between writes.
+// Saturating BLE with back-to-back writes is a common cause of disconnects.
+const blePause = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+
+// Wrapper for any BLE printer call: adds a timeout and a single retry on transient failure.
+const safeBleCall = async (fn, { timeoutMs = 10000, timeoutMsg = 'Printer communication timed out.', retries = 1 } = {}) => {
+	let lastErr;
+	for (let attempt = 0; attempt <= retries; attempt++) {
+		try {
+			const result = await withTimeout(fn(), timeoutMs, timeoutMsg);
+			return result;
+		} catch (e) {
+			lastErr = e;
+			const msg = String(e?.message || '').toLowerCase();
+			// Only retry on transient BLE/GATT errors, not on logic errors.
+			const isTransient =
+				msg.includes('gatt') ||
+				msg.includes('133') ||
+				msg.includes('timeout') ||
+				msg.includes('timed out') ||
+				msg.includes('disconnect') ||
+				msg.includes('not connected') ||
+				msg.includes('connection');
+			if (!isTransient || attempt >= retries) break;
+			// Brief pause before retry.
+			await blePause(300);
+		}
+	}
+	throw lastErr;
+};
+
 const ensureAndroidBluetoothPermissions = async () => {
 	if (Platform.OS !== 'android') return true;
 
@@ -410,6 +441,86 @@ const resolveRunStyle = ({ runStyle, pxPerDot, lineHeightPx }) => {
 			? { transform: [{ scaleX: widthScale }, { scaleY: heightScale }] }
 			: null),
 	};
+};
+
+// ─── Shared print-loop executor ───────────────────────────────────────────────
+// Extracted so both onPressPrint and onPickBleDevice use exactly the same
+// protected print logic. Every BLE write is wrapped in safeBleCall (timeout + retry)
+// with a small pause between writes to avoid saturating the BLE stack.
+const executePrintJobs = async ({
+	printTemplate,
+	maxDots,
+	COMMANDS,
+	msg,
+	getCachedImageSize,
+}) => {
+	const jobs = buildThermalPrintJobsFromWrappedTemplate({
+		wrappedTemplate: printTemplate,
+		COMMANDS,
+		defaultImageWidth: Math.min(575, maxDots || 575),
+	});
+
+	// HW_INIT resets the printer state — always do this first.
+	await safeBleCall(
+		() =>
+			BLEPrinter.printBill(
+				withPrinterCodeTable(COMMANDS.HARDWARE.HW_INIT + COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT, COMMANDS),
+				PRINTER_PRINT_OPTS,
+			),
+		{ timeoutMs: 8000, timeoutMsg: msg('printerProbeTimeout', 'Printer did not respond.') },
+	);
+
+	for (const job of jobs) {
+		if (job.type === 'text') {
+			if (job.value) {
+				const v = normalizeTextForEscPos(String(job.value));
+				await safeBleCall(
+					() => BLEPrinter.printBill(withPrinterCodeTable(v, COMMANDS), PRINTER_PRINT_OPTS),
+					{ timeoutMs: 10000, timeoutMsg: msg('printerProbeTimeout', 'Printer did not respond during text print.') },
+				);
+				await blePause();
+			}
+			continue;
+		}
+		if (job.type === 'imageBase64') {
+			const base64 = String(job.base64 || '').trim();
+			if (!base64) continue;
+			if (base64.includes('{{')) {
+				throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
+			}
+			const requestedW = clampInt(Number(job.imageWidth) || 0, 1, 5000);
+			const maxW = maxDots ? Math.min(requestedW, maxDots) : requestedW;
+			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
+			const size = await getCachedImageSize(base64);
+			const alignInt = job.align === 'center' ? 1 : job.align === 'right' ? 2 : 0;
+			const opts = { imageWidth: safeW, alignment: alignInt };
+			if (size?.width && size?.height) {
+				opts.imageHeight = Math.max(1, Math.round((safeW * size.height) / size.width));
+			} else {
+				opts.imageHeight = Math.max(1, Math.round(safeW * 0.75));
+			}
+			await safeBleCall(
+				() => BLEPrinter.printImageBase64(base64, opts),
+				{ timeoutMs: 15000, timeoutMsg: msg('printerProbeTimeout', 'Printer did not respond during image print.'), retries: 1 },
+			);
+			// Images are larger payloads — give a longer pause.
+			await blePause(150);
+			continue;
+		}
+	}
+
+	// Feed + reset after all jobs.
+	await safeBleCall(
+		() =>
+			BLEPrinter.printBill(
+				withPrinterCodeTable(
+					normalizeTextForEscPos(`\n\n\n${COMMANDS.TEXT_FORMAT.TXT_NORMAL}`),
+					COMMANDS,
+				),
+				PRINTER_PRINT_OPTS,
+			),
+		{ timeoutMs: 8000, timeoutMsg: msg('printerProbeTimeout', 'Printer did not respond during finalize.') },
+	);
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -755,61 +866,14 @@ const PrintPreviewScreen = () => {
 					return;
 				}
 
-				// IMPORTANT: use full printer width (maxDots) for print jobs, not the
-				// reduced wrapDots used only for preview soft-wrap detection.
-				const jobs = buildThermalPrintJobsFromWrappedTemplate({
-					wrappedTemplate: printTemplate,
+				await executePrintJobs({
+					printTemplate,
+					maxDots,
 					COMMANDS,
-					defaultImageWidth: Math.min(575, maxDots || 575),
+					msg,
+					getCachedImageSize,
 				});
 
-				await BLEPrinter.printBill(
-					withPrinterCodeTable(COMMANDS.HARDWARE.HW_INIT + COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT, COMMANDS),
-					PRINTER_PRINT_OPTS,
-				);
-				for (const job of jobs) {
-					if (job.type === 'text') {
-						if (job.value) {
-							const v = normalizeTextForEscPos(String(job.value));
-							await BLEPrinter.printBill(withPrinterCodeTable(v, COMMANDS), PRINTER_PRINT_OPTS);
-						}
-						continue;
-					}
-					if (job.type === 'imageBase64') {
-						const base64 = String(job.base64 || '').trim();
-						if (!base64) continue;
-						if (base64.includes('{{')) {
-							// Preview can show placeholders; printing cannot.
-							throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
-						}
-
-						// IMPORTANT (Android native module behavior): if we only pass `imageWidth`,
-						// the native code keeps the original bitmap height, generating huge data.
-						// That often shows as “shifted rows / stripes” on the printer.
-						const requestedW = clampInt(Number(job.imageWidth) || 0, 1, 5000);
-						const maxW = maxDots ? Math.min(requestedW, maxDots) : requestedW;
-						const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
-						const size = await getCachedImageSize(base64);
-						// 0=left 1=center 2=right — re-emitted before every 24-dot stripe in Java
-						const alignInt = job.align === 'center' ? 1 : job.align === 'right' ? 2 : 0;
-						const opts = { imageWidth: safeW, alignment: alignInt };
-						if (size?.width && size?.height) {
-							opts.imageHeight = Math.max(1, Math.round((safeW * size.height) / size.width));
-						} else {
-							// Conservative fallback to avoid printing a very tall bitmap.
-							opts.imageHeight = Math.max(1, Math.round(safeW * 0.75));
-						}
-						await BLEPrinter.printImageBase64(base64, opts);
-						continue;
-					}
-				}
-				await BLEPrinter.printBill(
-					withPrinterCodeTable(
-						normalizeTextForEscPos(`\n\n\n${COMMANDS.TEXT_FORMAT.TXT_NORMAL}`),
-						COMMANDS,
-					),
-					PRINTER_PRINT_OPTS,
-				);
 				Alert.alert(
 					msg('printSentTitle', '✅ Inspection note sent'),
 					msg('printSentMessage', 'The inspection note was sent to the printer.\n\nIf printing failed or issues occurred (paper jam, lost connection, etc.), you can retry by pressing the print button again.'),
@@ -817,6 +881,8 @@ const PrintPreviewScreen = () => {
 				);
 			} catch (e) {
 				console.warn('[print-preview] print error', e);
+				// Clean up BLE state so next attempt starts fresh.
+				try { await resetBleConnection(); } catch (_) {}
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
 				const errMsg = String(e?.message || e);
@@ -824,8 +890,10 @@ const PrintPreviewScreen = () => {
 					errMsg.toLowerCase().includes('timeout') ||
 					errMsg.toLowerCase().includes('timed out') ||
 					errMsg.toLowerCase().includes('gatt') ||
-					errMsg.toLowerCase().includes('133') || // Android GATT_ERROR code
-					errMsg.toLowerCase().includes('connect');
+					errMsg.toLowerCase().includes('133') ||
+					errMsg.toLowerCase().includes('connect') ||
+					errMsg.toLowerCase().includes('disconnect') ||
+					errMsg.toLowerCase().includes('not connected');
 				Alert.alert(
 					msg('printTitle', 'Print'),
 					isPrinterOff
@@ -836,27 +904,36 @@ const PrintPreviewScreen = () => {
 					[{ text: msg('ok', 'OK'), style: 'default' }],
 					{ cancelable: true },
 				);
-			}
-			finally {
+			} finally {
 				setIsPrinting(false);
 			}
 		};
 
-		run();
-	}, [connectToSavedPrinter, data?.printed_nota, maxDots, msg, msgWith, printTemplate]);
+		run().catch((e) => {
+			// Last-resort safety net — prevents unhandled promise rejections from crashing the app.
+			console.warn('[print-preview] unhandled print error', e);
+			setIsPrinting(false);
+		});
+	}, [connectToSavedPrinter, data?.printed_nota, maxDots, msg, msgWith, printTemplate, resetBleConnection]);
 
 	const onForgetSavedPrinter = useCallback(async () => {
-		await removeValueAsync(STORAGE_KEYS.bleMac);
-		await removeValueAsync(STORAGE_KEYS.bleName);
-		setSavedPrinterMac(null);
-		setSavedPrinterName('');
-		setPrinterConnectionStatus('disconnected');
-		setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
-		Alert.alert(
-			msg('printerReconnectedTitle', 'Printer'),
-			msg('savedPrinterDeleted', 'Saved printer was removed.'),
-		);
-	}, [msg]);
+		try {
+			await removeValueAsync(STORAGE_KEYS.bleMac);
+			await removeValueAsync(STORAGE_KEYS.bleName);
+			try { await resetBleConnection(); } catch (_) {}
+			setSavedPrinterMac(null);
+			setSavedPrinterName('');
+			setPrinterConnectionStatus('disconnected');
+			setPrinterConnectionMessage(msg('noSavedPrinter', 'No saved printer.'));
+			Alert.alert(
+				msg('printerReconnectedTitle', 'Printer'),
+				msg('savedPrinterDeleted', 'Saved printer was removed.'),
+			);
+		} catch (e) {
+			console.warn('[print-preview] forget printer error', e);
+			Alert.alert(msg('printTitle', 'Print'), String(e?.message || e));
+		}
+	}, [msg, resetBleConnection]);
 
 	const onRefreshBleDevices = useCallback(async () => {
 		setBleError(null);
@@ -937,46 +1014,14 @@ const PrintPreviewScreen = () => {
 					}),
 				);
 
-				const jobs = buildThermalPrintJobsFromWrappedTemplate({
-					wrappedTemplate: printTemplate,
+				await executePrintJobs({
+					printTemplate,
+					maxDots,
 					COMMANDS,
-					defaultImageWidth: Math.min(575, maxDots || 575),
+					msg,
+					getCachedImageSize,
 				});
-				await BLEPrinter.printBill(
-					withPrinterCodeTable(COMMANDS.HARDWARE.HW_INIT + COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT, COMMANDS),
-					PRINTER_PRINT_OPTS,
-				);
-				for (const job of jobs) {
-					if (job.type === 'text') {
-						if (job.value) {
-							const v = normalizeTextForEscPos(String(job.value));
-							await BLEPrinter.printBill(withPrinterCodeTable(v, COMMANDS), PRINTER_PRINT_OPTS);
-						}
-					} else if (job.type === 'imageBase64') {
-						const base64 = String(job.base64 || '').trim();
-						if (!base64) continue;
-						if (base64.includes('{{')) throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
-						const requestedW = clampInt(Number(job.imageWidth) || 0, 1, 5000);
-						const maxW = maxDots ? Math.min(requestedW, maxDots) : requestedW;
-						const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
-						const size = await getCachedImageSize(base64);
-						const alignInt = job.align === 'center' ? 1 : job.align === 'right' ? 2 : 0;
-						const opts = { imageWidth: safeW, alignment: alignInt };
-						if (size?.width && size?.height) {
-							opts.imageHeight = Math.max(1, Math.round((safeW * size.height) / size.width));
-						} else {
-							opts.imageHeight = Math.max(1, Math.round(safeW * 0.75));
-						}
-						await BLEPrinter.printImageBase64(base64, opts);
-					}
-				}
-				await BLEPrinter.printBill(
-					withPrinterCodeTable(
-						normalizeTextForEscPos(`\n\n\n${COMMANDS.TEXT_FORMAT.TXT_NORMAL}`),
-						COMMANDS,
-					),
-					PRINTER_PRINT_OPTS,
-				);
+
 				Alert.alert(
 					msg('printSentTitle', '✅ Inspection note sent'),
 					msg('printSentMessage', 'The inspection note was sent to the printer.\n\nIf printing failed or issues occurred (paper jam, lost connection, etc.), you can retry by pressing the print button again.'),
@@ -984,6 +1029,8 @@ const PrintPreviewScreen = () => {
 				);
 			} catch (e) {
 				console.warn('[print-preview] pick+print error', e);
+				// Clean up BLE state so next attempt starts fresh.
+				try { await resetBleConnection(); } catch (_) {}
 				setPrinterConnectionStatus('disconnected');
 				setPrinterConnectionMessage(String(e?.message || e));
 				const errMsg = String(e?.message || e);
@@ -992,12 +1039,14 @@ const PrintPreviewScreen = () => {
 					errMsg.toLowerCase().includes('timed out') ||
 					errMsg.toLowerCase().includes('gatt') ||
 					errMsg.toLowerCase().includes('133') ||
-					errMsg.toLowerCase().includes('connect');
+					errMsg.toLowerCase().includes('connect') ||
+					errMsg.toLowerCase().includes('disconnect') ||
+					errMsg.toLowerCase().includes('not connected');
 				Alert.alert(
 					msg('printTitle', 'Print'),
 					isPrinterOff
 						? msg('printerOffOrOutOfRange', '⚠️ Could not reach the printer.\n\nMake sure the printer is turned on, has paper, and is within Bluetooth range, then try again.')
-						: `${errMsg}`,
+						: msgWith('printErrorMessage', 'Print error: {{error}}', { error: errMsg }),
 					[{ text: msg('ok', 'OK'), style: 'default' }],
 					{ cancelable: true },
 				);
