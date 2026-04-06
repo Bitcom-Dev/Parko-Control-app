@@ -13,7 +13,7 @@
       "backgroundColor": "#890350"
     },
     "runtimeVersion": {
-      "policy": "nativeVersion"
+      "policy": "1.2.0"
     },
     "assetBundlePatterns": [
       "**/*"
