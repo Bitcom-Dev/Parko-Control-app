@@ -81,6 +81,17 @@ export default function Root() {
 				}}
 			/>
 			<Stack.Screen 
+				name='pv'
+				options={{
+					headerShown: Platform.OS === 'android' ? false : true,
+					headerBackTitleVisible: false,
+					animation: 'slide_from_right',
+					gestureEnabled: true,
+					animationDuration: 50,
+					animationTypeForReplace: 'push'
+				}}
+			/>
+			<Stack.Screen 
 				name='print-preview'
 				options={{
 					headerShown: Platform.OS === 'android' ? false : true,

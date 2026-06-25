@@ -37,6 +37,13 @@ const ModuleMenu = ({ visible, modules, user, onClose, onModuleSelect }) => {
 			desc: strings?.notaConstatareDesc || '',
 			route: '/(app)/nota-constatare',
 		},
+		PV: {
+			icon: 'gavel',
+			iconLib: 'MaterialIcons',
+			label: strings?.pv || 'Proces Verbal (PV)',
+			desc: strings?.pvDesc || '',
+			route: '/(app)/pv',
+		},
 	};
 
 	const handleModulePress = (moduleName) => {

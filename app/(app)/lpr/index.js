@@ -35,7 +35,7 @@ import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 const LIMIT = 10;
 
 // ─── PlateCard ────────────────────────────────────────────────────────────────
-const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLeftLoading = false }) => {
+const PlateCard = ({ item, strings, onNotaConstatare, onPV, onVehicleLeft, isVehicleLeftLoading = false }) => {
 	const [thumbnailData, setThumbnailData] = useState(null);
 	const [fullImageData, setFullImageData] = useState(null);
 	const [imageError, setImageError] = useState(false);
@@ -107,11 +107,17 @@ const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLe
 	};
 
 	const handleInspectionNote = () => {
-		if (typeof onInspectionNote === 'function') {
-			onInspectionNote(item);
+		if (typeof onNotaConstatare === 'function') {
+			onNotaConstatare(item);
 			return;
 		}
-		console.log('Nota de constatare:', item?.ID);
+	};
+
+	const handlePV = () => {
+		if (typeof onPV === 'function') {
+			onPV(item);
+			return;
+		}
 	};
 
 	const handleVehicleLeft = () => {
@@ -355,6 +361,7 @@ const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLe
 						{strings?.actions}
 					</CustomTextRegular>
 					<View style={{ flexDirection: 'column', gap: resize(8) }}>
+					{onNotaConstatare ? (
 						<TouchableOpacity
 							onPress={handleInspectionNote}
 							style={{
@@ -372,13 +379,13 @@ const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLe
 						>
 							<MaterialIcons name="note-add" size={resize(16)} color={purple} />
 							<CustomTextMedium style={{ ...general.fontSize9, color: purple }}>
-								{strings?.inspectionNote}
+								{strings?.notaConstatare}
 							</CustomTextMedium>
 						</TouchableOpacity>
-
+					) : null}
+					{onPV ? (
 						<TouchableOpacity
-							onPress={handleVehicleLeft}
-							disabled={isVehicleLeftLoading}
+							onPress={handlePV}
 							style={{
 								flex: 1,
 								flexDirection: 'row',
@@ -387,12 +394,34 @@ const PlateCard = ({ item, strings, onInspectionNote, onVehicleLeft, isVehicleLe
 								gap: resize(6),
 								paddingVertical: resize(10),
 								borderRadius: resize(10),
-								backgroundColor: lightOrange,
+								backgroundColor: 'rgba(21, 101, 192, 0.08)',
 								borderWidth: 1,
-								borderColor: 'rgba(243, 135, 19, 0.3)',
-								opacity: isVehicleLeftLoading ? 0.7 : 1,
+								borderColor: 'rgba(21, 101, 192, 0.3)',
 							}}
 						>
+							<MaterialIcons name="gavel" size={resize(16)} color="#1565C0" />
+							<CustomTextMedium style={{ ...general.fontSize9, color: '#1565C0' }}>
+								{strings?.procesVerbal}
+							</CustomTextMedium>
+						</TouchableOpacity>
+					) : null}
+					<TouchableOpacity
+						onPress={handleVehicleLeft}
+						disabled={isVehicleLeftLoading}
+						style={{
+							flex: 1,
+							flexDirection: 'row',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: resize(6),
+							paddingVertical: resize(10),
+							borderRadius: resize(10),
+							backgroundColor: lightOrange,
+							borderWidth: 1,
+							borderColor: 'rgba(243, 135, 19, 0.3)',
+							opacity: isVehicleLeftLoading ? 0.7 : 1,
+						}}
+					>
 							{isVehicleLeftLoading ? (
 								<ActivityIndicator size="small" color={orange} />
 							) : (
@@ -477,6 +506,10 @@ const LPRScreen = () => {
 	const navigation = useNavigation();
 	const router = useRouter();
 
+	const userModules = userSession?.user?.modules || [];
+	const hasNC = userModules.includes('NOTA_CONSTATARE');
+	const hasPV = userModules.includes('PV');
+
 	const [plates, setPlates] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [page, setPage] = useState(1);
@@ -485,6 +518,7 @@ const LPRScreen = () => {
 	const [errorMessage, setErrorMessage] = useState('');
 	const [refreshing, setRefreshing] = useState(false);
 	const [vehicleLeftLoadingId, setVehicleLeftLoadingId] = useState(null);
+	const [documentPickerItem, setDocumentPickerItem] = useState(null);
 	const hasInitialized = useRef(false);
 	const flatListRef = useRef(null);
 
@@ -518,10 +552,34 @@ const LPRScreen = () => {
 
 	const handleInspectionNote = useCallback(
 		(plateItem) => {
+			if (hasNC && hasPV) {
+				// Both enabled: picker modal as fallback (shouldn't be needed since card shows 2 buttons)
+				setDocumentPickerItem(plateItem);
+			} else if (hasNC) {
+				navigateToDocument(plateItem, '/nota-constatare');
+			} else if (hasPV) {
+				navigateToDocument(plateItem, '/pv');
+			}
+		},
+		[hasNC, hasPV]
+	);
+
+	const handleNotaConstatare = useCallback(
+		(plateItem) => navigateToDocument(plateItem, '/nota-constatare'),
+		[router]
+	);
+
+	const handlePV = useCallback(
+		(plateItem) => navigateToDocument(plateItem, '/pv'),
+		[router]
+	);
+
+	const navigateToDocument = useCallback(
+		(plateItem, destination) => {
+			setDocumentPickerItem(null);
 			const licensePlate = plateItem?.plate ? String(plateItem.plate) : '';
-			console.log('Navigating to inspection note for plate:', plateItem.ID);
 			router.push({
-				pathname: '/nota-constatare',
+				pathname: destination,
 				params: {
 					license_plate: licensePlate,
 					lpr_id: plateItem?.ID != null ? String(plateItem.ID) : undefined,
@@ -1048,7 +1106,8 @@ const LPRScreen = () => {
 							<PlateCard
 								item={item}
 								strings={strings}
-								onInspectionNote={handleInspectionNote}
+								onNotaConstatare={hasNC ? handleNotaConstatare : null}
+								onPV={hasPV ? handlePV : null}
 								onVehicleLeft={handleVehicleLeft}
 								isVehicleLeftLoading={vehicleLeftLoadingId === item?.ID}
 							/>
@@ -1077,6 +1136,100 @@ const LPRScreen = () => {
 					<PaginationBar />
 				</>
 			)}
+
+			{/* ── Document Type Picker Modal ── */}
+			<Modal
+				visible={documentPickerItem !== null}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setDocumentPickerItem(null)}
+			>
+				<TouchableOpacity
+					style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+					activeOpacity={1}
+					onPress={() => setDocumentPickerItem(null)}
+				>
+					<TouchableOpacity activeOpacity={1}>
+						<View
+							style={{
+								backgroundColor: white,
+								borderTopLeftRadius: resize(20),
+								borderTopRightRadius: resize(20),
+								paddingTop: resize(20),
+								paddingBottom: resize(36),
+								paddingHorizontal: resize(20),
+							}}
+						>
+							<CustomTextBold style={{ ...general.fontSize14, color: black, marginBottom: resize(6) }}>
+								{strings?.chooseDocumentTitle}
+							</CustomTextBold>
+							<CustomTextRegular style={{ ...general.fontSize10, color: gray, marginBottom: resize(20) }}>
+								{strings?.chooseDocumentDesc}
+							</CustomTextRegular>
+
+							<TouchableOpacity
+								onPress={() => navigateToDocument(documentPickerItem, '/nota-constatare')}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									paddingVertical: resize(14),
+									paddingHorizontal: resize(16),
+									backgroundColor: 'rgba(137, 3, 80, 0.08)',
+									borderRadius: resize(12),
+									borderWidth: 1,
+									borderColor: 'rgba(137, 3, 80, 0.2)',
+									marginBottom: resize(12),
+									gap: resize(12),
+								}}
+							>
+								<MaterialIcons name="note-add" size={resize(22)} color={purple} />
+								<View style={{ flex: 1 }}>
+									<CustomTextMedium style={{ ...general.fontSize11, color: purple }}>
+										{strings?.notaConstatare}
+									</CustomTextMedium>
+								</View>
+								<MaterialIcons name="chevron-right" size={resize(20)} color={purple} />
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								onPress={() => navigateToDocument(documentPickerItem, '/pv')}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									paddingVertical: resize(14),
+									paddingHorizontal: resize(16),
+									backgroundColor: 'rgba(243, 135, 19, 0.08)',
+									borderRadius: resize(12),
+									borderWidth: 1,
+									borderColor: 'rgba(243, 135, 19, 0.3)',
+									marginBottom: resize(12),
+									gap: resize(12),
+								}}
+							>
+								<MaterialIcons name="gavel" size={resize(22)} color={orange} />
+								<View style={{ flex: 1 }}>
+									<CustomTextMedium style={{ ...general.fontSize11, color: orange }}>
+										{strings?.procesVerbal}
+									</CustomTextMedium>
+								</View>
+								<MaterialIcons name="chevron-right" size={resize(20)} color={orange} />
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								onPress={() => setDocumentPickerItem(null)}
+								style={{
+									paddingVertical: resize(12),
+									alignItems: 'center',
+								}}
+							>
+								<CustomTextMedium style={{ ...general.fontSize10, color: gray }}>
+									{strings?.cancel}
+								</CustomTextMedium>
+							</TouchableOpacity>
+						</View>
+					</TouchableOpacity>
+				</TouchableOpacity>
+			</Modal>
 		</View>
 	);
 };
