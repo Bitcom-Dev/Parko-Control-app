@@ -25,6 +25,8 @@ const Layout = () => {
 		RobotoMono_700Bold,
 	});	
 
+	const strings = useMessage();
+
 	const [isLoggedIn, setLoggedIn] = useState(false);
     const [accessToken, setAccessToken] = useState(null);
     const [refreshToken, setRefreshToken] = useState(null);
