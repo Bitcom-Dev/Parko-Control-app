@@ -46,6 +46,15 @@
       "main": "History",
       "desc": "Here you can find the latest verifications!"
     },
+    "PrintHistorySelectScreen": {
+      "main": "Print History",
+      "desc": "Select the module to view print history for",
+      "notaConstatare": "Inspection Note",
+      "notaConstatareDesc": "Inspection note print history",
+      "pv": "Proces Verbal",
+      "pvDesc": "Proces verbal print history",
+      "noModules": "No print modules available."
+    },
     "SettingsScreen": {
       "title": "Settings",
       "language": "Language",
@@ -316,6 +325,15 @@
     "HistoryScreen": {
       "main": "Istoric",
       "desc": "Aici poti gasi ultimele verificari!"
+    },
+    "PrintHistorySelectScreen": {
+      "main": "Istoric Printari",
+      "desc": "Selecteaza modulul pentru care doresti sa vizualizezi istoricul printarilor",
+      "notaConstatare": "Nota de Constatare",
+      "notaConstatareDesc": "Istoricul notelor de constatare printate",
+      "pv": "Proces Verbal",
+      "pvDesc": "Istoricul proceselor verbale printate",
+      "noModules": "Nu exista module de printare disponibile."
     },
     "SettingsScreen": {
       "title": "Setari",

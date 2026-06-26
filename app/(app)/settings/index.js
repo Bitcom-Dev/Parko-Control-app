@@ -35,7 +35,7 @@ const IndexSettings = () => {
             iconColor: purple,
         },
         {
-            href: '/settings/print_history',
+            href: '/settings/print-history-select',
             icon: 'print',
             title: strings.printHistory,
             subtitle: strings.printHistorySubtitle,

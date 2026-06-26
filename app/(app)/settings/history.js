@@ -10,7 +10,7 @@ import { resize, general } from '../../../util/style';
 import { controlInstance } from '../../../util/instances';
 
 const timestampToString = (ts) => {
-    const date = new Date(ts);
+    const date = new Date(ts * 1000);
     const year = date.getFullYear();
     const month = ('0' + (date.getMonth() + 1)).slice(-2);
     const day = ('0' + date.getDate()).slice(-2);
@@ -31,7 +31,7 @@ const Verification = ({ vehicle, ts, active, details, onPress }) => (
         <View style={styles.itemTextWrap}>
             <CustomTextMedium style={styles.itemTitle}>{vehicle}</CustomTextMedium>
             <CustomTextRegular style={styles.itemSubtitle}>
-                {timestampToString(ts * 1000)}
+                {timestampToString(ts)}
             </CustomTextRegular>
         </View>
         <MaterialIcons name="chevron-right" size={resize(22)} color={gray} />

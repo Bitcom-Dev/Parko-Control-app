@@ -1,0 +1,140 @@
+PARKO CONTROL – DOCUMENTATIE FUNCTIONALITATI
+=============================================
+
+
+────────────────────────────────────────────
+a. AUTENTIFICARE (Login)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Ecranul de autentificare permite agentului sa se conecteze in aplicatie
+introducand numele de utilizator si parola. La apasarea butonului de
+login, credentialele sunt trimise catre server; in caz de cont dezactivat
+sau date invalide, utilizatorul primeste un mesaj de eroare corespunzator.
+Dupa autentificarea reusita, aplicatia redirectioneaza automat catre ecranul
+principal.
+
+
+────────────────────────────────────────────
+b. VERIFICARE VEHICUL (Home)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Ecranul principal permite agentului sa verifice in timp real daca un
+vehicul are o sesiune de parcare activa si platita. Se introduce numarul
+de inmatriculare, iar aplicatia interogheaza serverul si afiseaza detalii
+despre sesiune (zona, ora de inceput/sfarsit, suma platita). In partea
+de jos a ecranului este vizibil un sumar al ultimelor 5 verificari efectuate
+recent. De pe acest ecran se poate initia rapid o lucrare/proces verbal pentru
+vehiculele fara plata.
+
+
+────────────────────────────────────────────
+c. CAMERA – RECUNOASTERE PLACUTE IN TIMP REAL (Camera LPR)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Ecranul de camera foloseste camera telefonului pentru a captura cadre la
+interval de 500ms si a le trimite prin WebSocket catre serverul de
+recunoastere a placutelor (LPR). Placutele detectate apar intr-o lista
+in timp real, cu indicatorul de activ/inactiv al conexiunii WebSocket.
+Agentul poate porni/opri captura cu un singur buton de tip Play/Pause,
+fara a fi necesar sa fotografieze manual fiecare masina.
+
+
+────────────────────────────────────────────
+d. LISTA PLACUTE LPR (LPR)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Aceasta sectiune afiseaza o lista paginata a tuturor placutelor de
+inmatriculare detectate de sistemul de camere fixe LPR. Fiecare intrare
+contine o miniatura a fotografiei, numarul placutei, ora detectiei si
+distanta estimata fata de pozitia agentului. Se pot deschide fotografiile
+in ecran complet, iar din fiecare card se poate accesa direct Google Maps
+sau Waze, ori se poate genera o lucrare/proces verbal pentru vehiculul respectiv.
+
+
+────────────────────────────────────────────
+e. LUCRARI / PROCESE VERBALE
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Formular pentru intocmirea unui proces-verbal de constatare a contraventiei.
+Agentul selecteaza tipul de contraventie, completeaza campurile obligatorii
+(precompletate partial cu datele vehiculului si ale agentului), fotografiaza
+vehiculul direct din aplicatie si semneaza documentul. La final, documentul
+este trimis serverului si se genereaza un bon de tiparire ce poate fi
+imediat printat pe o imprimanta termica Bluetooth.
+
+
+────────────────────────────────────────────
+f. PREVIZUALIZARE SI TIPARIRE (Print Preview)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Ecranul de previzualizare afiseaza continutul formatat al notei de constatare
+inainte de tiparire. Agentul poate configura imprimanta termica Bluetooth
+(salvand adresa MAC si numele dispozitivului) si poate ajusta latimea benzii
+in dots. La apasarea butonului de tiparire, documentul este trimis catre
+imprimanta selectata via BLE, cu suport pentru diacritice romanesti si
+codificare CP852 specifica imprimantelor ESC/POS.
+
+
+────────────────────────────────────────────
+g. SETARI – PROFIL SI MENIU (Settings)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Ecranul de setari centralizeaza informatiile profilului agentului conectat
+(nume complet, username, numar de module active) si ofera acces rapid la
+istoricul verificarilor, istoricul printarilor si setarile de limba.
+Din acest ecran se poate efectua si deconectarea (sign out) din aplicatie.
+
+
+────────────────────────────────────────────
+h. ISTORIC VERIFICARI (History)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Lista completa a tuturor verificarilor de vehicule efectuate de agentul
+conectat, cu indicatori vizuali verde/rosu pentru sesiuni valide/invalide.
+Inregistrarile sunt incarcate paginal (infinite scroll) si includ numarul
+de inmatriculare si data/ora verificarii. Apasand pe o intrare, agentul
+este redirectionat la ecranul principal cu datele acelei verificari
+pre-completate.
+
+
+────────────────────────────────────────────
+i. ISTORIC PRINTARI (Print History)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Afiseaza toate notele de constatare tiparite anterior de agentul conectat,
+in ordine cronologica, cu numar de inmatriculare, data/ora si statusul
+de raportare. Agentul poate reincarca si retipari orice nota anterioara
+direct de pe acest ecran, utila in cazul in care banda termica a fost
+deteriorata sau tiparirea initiala a esuat.
+
+
+────────────────────────────────────────────
+j. SETARI LIMBA (Language)
+────────────────────────────────────────────
+
+[SCREENSHOT]
+
+Permite schimbarea limbii interfetei aplicatiei intre Romana si Engleza.
+Selectia este salvata in sesiunea curenta si se aplica imediat in toata
+aplicatia, inclusiv etichetele formularelor, mesajele de eroare si
+titlurile ecranelor.
+
+

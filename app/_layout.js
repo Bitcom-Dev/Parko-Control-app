@@ -89,7 +89,7 @@ const Layout = () => {
 
 	const getMyLocation = async () => {
 		try {
-			const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+			const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
 			if (loc?.coords?.latitude != null) {
 				return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
 			}

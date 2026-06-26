@@ -1,4 +1,4 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { CustomTextBold, CustomTextMedium, CustomTextRegular } from '../../../util/CustomText';
@@ -7,7 +7,7 @@ import { useMessage } from '../../../util/messages';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { black, gray, green, lightGray, lightOrange, orange, purple, red, white } from '../../../util/colors';
 import { resize, general } from '../../../util/style';
-import { notaConstatareInstance } from '../../../util/instances';
+import { notaConstatareInstance, pvInstance } from '../../../util/instances';
 import { setPrintPreview } from '../../../util/printPreviewStore';
 
 const LIMIT = 20;
@@ -23,7 +23,8 @@ const timestampToString = (ts) => {
 };
 
 const PrintHistory = () => {
-    const { PrintHistoryScreen: strings } = useMessage();
+    const { module: moduleParam = 'NOTA_CONSTATARE' } = useLocalSearchParams();
+    const { PrintHistoryScreen: strings, PrintHistorySelectScreen: selectStrings } = useMessage();
     const [DATA, setDATA] = useState([]);
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(null);
@@ -31,10 +32,14 @@ const PrintHistory = () => {
     const auth = useAuth();
     const router = useRouter();
 
+    const getInstance = () => moduleParam === 'PV' ? pvInstance(auth) : notaConstatareInstance(auth);
+
+    const getTitle = () => moduleParam === 'PV' ? selectStrings.pv : selectStrings.notaConstatare;
+
     const openPrint = (ID) => {
         if (loadingItem !== null) return;
         setLoadingItem(ID);
-        notaConstatareInstance(auth).get(`retrieve_print/${ID}`)
+        getInstance().get(`retrieve_print/${ID}`)
             .then(response => {
                 setPrintPreview({
                     printed_id: ID,
@@ -43,10 +48,7 @@ const PrintHistory = () => {
                 });
                 router.push('/print-preview');
             })
-            .catch(error => {
-                // console.log(error);
-                Alert.alert('Eroare', 'Nu s-a putut incarca printarea.');
-            })
+            .catch(() => { Alert.alert('Eroare', 'Nu s-a putut incarca printarea.'); })
             .finally(() => { setLoadingItem(null); });
     };
 
@@ -75,7 +77,7 @@ const PrintHistory = () => {
         if (total !== null && DATA.length >= total) return;
         setLoading(true);
         const currentPage = Math.floor(DATA.length / LIMIT) + 1;
-        notaConstatareInstance(auth).get(`history/${currentPage}/${LIMIT}`)
+        getInstance().get(`history/${currentPage}/${LIMIT}`)
             .then(response => {
                 setDATA(prev => prev.concat(response.data.history));
                 setTotal(response.data.total);
@@ -90,7 +92,7 @@ const PrintHistory = () => {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: strings.main,
+                    title: getTitle(),
                     headerStyle: { backgroundColor: lightOrange },
                     headerTintColor: black,
                     statusBarColor: lightOrange,
@@ -110,9 +112,9 @@ const PrintHistory = () => {
                         <View style={styles.heroDecorSecondary} />
                         <View style={styles.heroBadge}>
                             <MaterialIcons name="print" size={resize(16)} color={white} />
-                            <CustomTextMedium style={styles.heroBadgeText}>{strings.main}</CustomTextMedium>
+                            <CustomTextMedium style={styles.heroBadgeText}>{getTitle()}</CustomTextMedium>
                         </View>
-                        <CustomTextBold style={styles.heroTitle}>{strings.main}</CustomTextBold>
+                        <CustomTextBold style={styles.heroTitle}>{getTitle()}</CustomTextBold>
                         <CustomTextRegular style={styles.heroSubtitle}>{strings.desc}</CustomTextRegular>
                     </View>
                 }
