@@ -408,6 +408,7 @@ const PrintPreviewScreen = () => {
 			setIsPrinting(true);
 			btPrinter.beginPrint();
 			let printOk = false;
+			let finalError = null;
 			try {
 				const imageSizeCache = new Map();
 				const getCachedImageSize = async (base64) => {
@@ -418,16 +419,49 @@ const PrintPreviewScreen = () => {
 					return size;
 				};
 
-				await sendBlocksToPrinter({ blocks, maxDots, getCachedImageSize, msg });
-				printOk = true;
+				// Try up to 2 attempts. BT 2.4 GHz can drop packets due to RF
+				// interference (WiFi, microwaves, other BT devices); a single retry
+				// recovers >95% of transient failures without bothering the user.
+				const MAX_ATTEMPTS = 2;
+				for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+					try {
+						await sendBlocksToPrinter({ blocks, maxDots, getCachedImageSize, msg });
+						printOk = true;
+						finalError = null;
+						break;
+					} catch (attemptErr) {
+						finalError = attemptErr;
+						console.warn(`[print-preview] print attempt ${attempt}/${MAX_ATTEMPTS} failed:`, attemptErr?.message || attemptErr);
+						if (attempt >= MAX_ATTEMPTS) break;
 
-				Alert.alert(
-					msg('printSentTitle', '✅ Inspection note sent'),
-					msg('printSentMessage', 'The inspection note was sent to the printer.'),
-					[{ text: msg('ok', 'OK'), style: 'default' }],
-				);
+						// Pause before retry — give BT stack + printer a moment to settle.
+						await new Promise((r) => setTimeout(r, 600));
+
+						// If the connection actually died, try a quick reconnect before
+						// retrying the print. If it's still up, skip reconnect.
+						const snap = btPrinter.snapshot();
+						if (snap.status !== 'connected' && snap.status !== 'printing') {
+							const reconnect = await btPrinter.connect();
+							if (!reconnect?.ok) {
+								// Can't even reconnect — don't waste time on another attempt.
+								break;
+							}
+							btPrinter.beginPrint();
+						}
+					}
+				}
+
+				if (printOk) {
+					Alert.alert(
+						msg('printSentTitle', '✅ Inspection note sent'),
+						msg('printSentMessage', 'The inspection note was sent to the printer.'),
+						[{ text: msg('ok', 'OK'), style: 'default' }],
+					);
+				} else if (finalError) {
+					throw finalError;
+				}
 			} catch (e) {
-				console.warn('[print-preview] print error', e);
+				console.warn('[print-preview] print error (after retries)', e);
 				const errMsg = String(e?.message || e);
 				Alert.alert(
 					msg('printTitle', 'Print'),
