@@ -1,0 +1,134 @@
+diff --git a/android/app/src/main/java/com/parkocontrol/bordeac03/btprinter/EscPosImage.java b/android/app/src/main/java/com/parkocontrol/bordeac03/btprinter/EscPosImage.java
+index 3f85c2f..62f1baa 100644
+--- a/android/app/src/main/java/com/parkocontrol/bordeac03/btprinter/EscPosImage.java
++++ b/android/app/src/main/java/com/parkocontrol/bordeac03/btprinter/EscPosImage.java
+@@ -36,12 +36,18 @@ final class EscPosImage {
+ 
+     private EscPosImage() {}
+ 
+-    // Datecs DPP-450 physical width: 832 dots.
++    // Datecs DPP-450 physical width: 832 dots, but anything above ~576 dots
++    // strains the internal buffer for tall images. Caller should clamp on
++    // the JS side; we still clamp here as a safety net.
+     private static final int MAX_WIDTH_DOTS = 832;
+     // Density mode for ESC *: 33 = 24-dot triple-density (1:1 aspect, ~200 DPI).
+     private static final byte ESC_STAR_MODE = 33;
+     // Each column in mode 33 carries 24 bits = 3 bytes.
+     private static final int BAND_HEIGHT = 24;
++    // Luma threshold: anything DARKER than this prints as black.
++    // 160 (vs textbook 128) is forgiving for slightly-grey scans/JPEG noise
++    // while still keeping pure white background fully empty.
++    private static final int LUMA_THRESHOLD = 160;
+ 
+     static byte[] rasterize(String base64, int requestedWidthDots, int alignment) throws IOException {
+         byte[] decoded = Base64.decode(base64, Base64.DEFAULT);
+@@ -87,7 +93,7 @@ final class EscPosImage {
+                     int b = Color.blue(px);
+                     luma = (r * 30 + g * 59 + b * 11) / 100;
+                 }
+-                grid[y][x] = (byte) (luma < 128 ? 1 : 0);
++                grid[y][x] = (byte) (luma < LUMA_THRESHOLD ? 1 : 0);
+             }
+         }
+ 
+@@ -95,6 +101,11 @@ final class EscPosImage {
+ 
+         ByteArrayOutputStream out = new ByteArrayOutputStream(targetW * targetH / 4 + 256);
+ 
++        // Zero left margin: GS L nL nH  (1D 4C 0 0) — ensures the image starts at
++        // the very left edge of paper, not offset by a residual margin from
++        // an earlier print job.
++        out.write(0x1D); out.write(0x4C); out.write(0); out.write(0);
++
+         // Alignment: ESC a n  (do this BEFORE setting line spacing).
+         byte alignByte = (byte) (alignment == 1 ? 1 : alignment == 2 ? 2 : 0);
+         out.write(0x1B); out.write(0x61); out.write(alignByte);
+diff --git a/app/(app)/print-preview/index.js b/app/(app)/print-preview/index.js
+index 39bdab7..42acdca 100644
+--- a/app/(app)/print-preview/index.js
++++ b/app/(app)/print-preview/index.js
+@@ -225,46 +225,33 @@ const ReceiptImage = ({ base64OrPlaceholder, desiredWidthPx, align }) => {
+ // If ANY write throws (printer disappears), we propagate up to onPressPrint
+ // which shows a clean disconnect message — no more crash.
+ 
++// Build a byte stream from a list of text blocks.
++//
++// Design notes:
++//   • We emit ESC a (alignment) UNCONDITIONALLY at the start of every line.
++//     This adds 3 bytes/line but eliminates an entire class of bugs where
++//     the printer's internal alignment state drifts out of sync with our JS
++//     state machine (e.g. after a printImageBase64 call which resets ALIGN
++//     internally on the Java side).
++//   • Same for size/bold/underline/font — we emit them per-run, no delta
++//     tracking. The bytes are tiny; correctness > optimization here.
+ const buildTextStream = (blocks) => {
+ 	const chunks = [];
+-	let st = { align: 'left', bold: false, underline: false, font: 'a', w2x: false, h2x: false };
+-	let activeAlign = 'left';
+-
+-	const writeStyleDelta = (next) => {
+-		const out = [];
+-		if (next.align !== activeAlign) {
+-			const a = next.align === 'center' ? 1 : next.align === 'right' ? 2 : 0;
+-			out.push(ALIGN(a));
+-			activeAlign = next.align;
+-		}
+-		if (next.bold !== st.bold) out.push(BOLD(next.bold));
+-		if (next.underline !== st.underline) out.push(UNDERLINE(next.underline));
+-		if (next.font !== st.font) out.push(FONT(next.font === 'b'));
+-		if (next.w2x !== st.w2x || next.h2x !== st.h2x) out.push(SIZE(next.w2x, next.h2x));
+-		st = { ...next };
+-		return out;
+-	};
+-
+ 	const pushBuf = (b) => chunks.push(b);
+ 
++	const alignByteFor = (align) => align === 'center' ? 1 : align === 'right' ? 2 : 0;
++
+ 	for (const b of blocks) {
+ 		if (b.type === 'blank') { pushBuf(LF); continue; }
+ 		if (b.type === 'text') {
+-			// Emit alignment first (per-line).
+-			if (activeAlign !== b.align) {
+-				pushBuf(ALIGN(b.align === 'center' ? 1 : b.align === 'right' ? 2 : 0));
+-				activeAlign = b.align;
+-			}
++			// Always emit ALIGN at the start of EVERY line, no delta tracking.
++			pushBuf(ALIGN(alignByteFor(b.align)));
+ 			for (const run of b.runs || []) {
+-				const next = {
+-					align: b.align,
+-					bold: !!run.style?.bold,
+-					underline: !!run.style?.underline,
+-					font: run.style?.font === 'b' ? 'b' : 'a',
+-					w2x: !!run.style?.width2x,
+-					h2x: !!run.style?.height2x,
+-				};
+-				for (const seg of writeStyleDelta(next)) pushBuf(seg);
++				// Always emit full per-run style. Cheap and correct.
++				pushBuf(BOLD(!!run.style?.bold));
++				pushBuf(UNDERLINE(!!run.style?.underline));
++				pushBuf(FONT(run.style?.font === 'b'));
++				pushBuf(SIZE(!!run.style?.width2x, !!run.style?.height2x));
+ 				pushBuf(encodeTextCp852(run.text));
+ 			}
+ 			pushBuf(LF);
+@@ -308,11 +295,16 @@ const sendBlocksToPrinter = async ({ blocks, maxDots, getCachedImageSize, msg })
+ 				throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
+ 			}
+ 			const requestedW = clampInt(Number(b.widthDots) || 0, 1, 5000);
++			// Clamp to a SAFE width for the DPP-450 internal buffer. The printer
++			// physical max is 832 dots, but anything above ~576 dots starts to
++			// risk buffer overruns / partial prints depending on image height.
+ 			const maxW = maxDots ? Math.min(requestedW || maxDots, maxDots) : (requestedW || maxDots);
+-			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
++			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, Math.min(maxW || 576, 576));
+ 			const alignInt = b.align === 'center' ? 1 : b.align === 'right' ? 2 : 0;
+ 			await btPrinter.printImageBase64(base64, safeW, alignInt);
+-			// after image, push a newline
++			// The native side resets ALIGN to 0 after the image, so the next
++			// text line that we flush will re-emit its own ALIGN unconditionally
++			// (see buildTextStream above) — no manual reset needed here.
+ 			await btPrinter.writeBase64(toBase64(LF));
+ 			continue;
+ 		}

@@ -36,12 +36,18 @@ final class EscPosImage {
 
     private EscPosImage() {}
 
-    // Datecs DPP-450 physical width: 832 dots.
+    // Datecs DPP-450 physical width: 832 dots, but anything above ~576 dots
+    // strains the internal buffer for tall images. Caller should clamp on
+    // the JS side; we still clamp here as a safety net.
     private static final int MAX_WIDTH_DOTS = 832;
     // Density mode for ESC *: 33 = 24-dot triple-density (1:1 aspect, ~200 DPI).
     private static final byte ESC_STAR_MODE = 33;
     // Each column in mode 33 carries 24 bits = 3 bytes.
     private static final int BAND_HEIGHT = 24;
+    // Luma threshold: anything DARKER than this prints as black.
+    // 160 (vs textbook 128) is forgiving for slightly-grey scans/JPEG noise
+    // while still keeping pure white background fully empty.
+    private static final int LUMA_THRESHOLD = 160;
 
     static byte[] rasterize(String base64, int requestedWidthDots, int alignment) throws IOException {
         byte[] decoded = Base64.decode(base64, Base64.DEFAULT);
@@ -87,13 +93,18 @@ final class EscPosImage {
                     int b = Color.blue(px);
                     luma = (r * 30 + g * 59 + b * 11) / 100;
                 }
-                grid[y][x] = (byte) (luma < 128 ? 1 : 0);
+                grid[y][x] = (byte) (luma < LUMA_THRESHOLD ? 1 : 0);
             }
         }
 
         try { scaled.recycle(); } catch (Throwable ignored) {}
 
         ByteArrayOutputStream out = new ByteArrayOutputStream(targetW * targetH / 4 + 256);
+
+        // Zero left margin: GS L nL nH  (1D 4C 0 0) — ensures the image starts at
+        // the very left edge of paper, not offset by a residual margin from
+        // an earlier print job.
+        out.write(0x1D); out.write(0x4C); out.write(0); out.write(0);
 
         // Alignment: ESC a n  (do this BEFORE setting line spacing).
         byte alignByte = (byte) (alignment == 1 ? 1 : alignment == 2 ? 2 : 0);

@@ -225,46 +225,33 @@ const ReceiptImage = ({ base64OrPlaceholder, desiredWidthPx, align }) => {
 // If ANY write throws (printer disappears), we propagate up to onPressPrint
 // which shows a clean disconnect message — no more crash.
 
+// Build a byte stream from a list of text blocks.
+//
+// Design notes:
+//   • We emit ESC a (alignment) UNCONDITIONALLY at the start of every line.
+//     This adds 3 bytes/line but eliminates an entire class of bugs where
+//     the printer's internal alignment state drifts out of sync with our JS
+//     state machine (e.g. after a printImageBase64 call which resets ALIGN
+//     internally on the Java side).
+//   • Same for size/bold/underline/font — we emit them per-run, no delta
+//     tracking. The bytes are tiny; correctness > optimization here.
 const buildTextStream = (blocks) => {
 	const chunks = [];
-	let st = { align: 'left', bold: false, underline: false, font: 'a', w2x: false, h2x: false };
-	let activeAlign = 'left';
-
-	const writeStyleDelta = (next) => {
-		const out = [];
-		if (next.align !== activeAlign) {
-			const a = next.align === 'center' ? 1 : next.align === 'right' ? 2 : 0;
-			out.push(ALIGN(a));
-			activeAlign = next.align;
-		}
-		if (next.bold !== st.bold) out.push(BOLD(next.bold));
-		if (next.underline !== st.underline) out.push(UNDERLINE(next.underline));
-		if (next.font !== st.font) out.push(FONT(next.font === 'b'));
-		if (next.w2x !== st.w2x || next.h2x !== st.h2x) out.push(SIZE(next.w2x, next.h2x));
-		st = { ...next };
-		return out;
-	};
-
 	const pushBuf = (b) => chunks.push(b);
+
+	const alignByteFor = (align) => align === 'center' ? 1 : align === 'right' ? 2 : 0;
 
 	for (const b of blocks) {
 		if (b.type === 'blank') { pushBuf(LF); continue; }
 		if (b.type === 'text') {
-			// Emit alignment first (per-line).
-			if (activeAlign !== b.align) {
-				pushBuf(ALIGN(b.align === 'center' ? 1 : b.align === 'right' ? 2 : 0));
-				activeAlign = b.align;
-			}
+			// Always emit ALIGN at the start of EVERY line, no delta tracking.
+			pushBuf(ALIGN(alignByteFor(b.align)));
 			for (const run of b.runs || []) {
-				const next = {
-					align: b.align,
-					bold: !!run.style?.bold,
-					underline: !!run.style?.underline,
-					font: run.style?.font === 'b' ? 'b' : 'a',
-					w2x: !!run.style?.width2x,
-					h2x: !!run.style?.height2x,
-				};
-				for (const seg of writeStyleDelta(next)) pushBuf(seg);
+				// Always emit full per-run style. Cheap and correct.
+				pushBuf(BOLD(!!run.style?.bold));
+				pushBuf(UNDERLINE(!!run.style?.underline));
+				pushBuf(FONT(run.style?.font === 'b'));
+				pushBuf(SIZE(!!run.style?.width2x, !!run.style?.height2x));
 				pushBuf(encodeTextCp852(run.text));
 			}
 			pushBuf(LF);
@@ -308,11 +295,16 @@ const sendBlocksToPrinter = async ({ blocks, maxDots, getCachedImageSize, msg })
 				throw new Error(msg('missingImagePlaceholder', 'Missing image (placeholder) in template.'));
 			}
 			const requestedW = clampInt(Number(b.widthDots) || 0, 1, 5000);
+			// Clamp to a SAFE width for the DPP-450 internal buffer. The printer
+			// physical max is 832 dots, but anything above ~576 dots starts to
+			// risk buffer overruns / partial prints depending on image height.
 			const maxW = maxDots ? Math.min(requestedW || maxDots, maxDots) : (requestedW || maxDots);
-			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, maxW || 575);
+			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, Math.min(maxW || 576, 576));
 			const alignInt = b.align === 'center' ? 1 : b.align === 'right' ? 2 : 0;
 			await btPrinter.printImageBase64(base64, safeW, alignInt);
-			// after image, push a newline
+			// The native side resets ALIGN to 0 after the image, so the next
+			// text line that we flush will re-emit its own ALIGN unconditionally
+			// (see buildTextStream above) — no manual reset needed here.
 			await btPrinter.writeBase64(toBase64(LF));
 			continue;
 		}
