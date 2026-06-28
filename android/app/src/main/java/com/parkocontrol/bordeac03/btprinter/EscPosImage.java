@@ -7,6 +7,8 @@ import android.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Converts a base64-encoded PNG/JPEG into ESC/POS byte commands for the
@@ -14,22 +16,21 @@ import java.io.IOException;
  *
  * IMPORTANT #1: DPP-450 does NOT support the modern raster command `GS v 0`
  * (1D 76 30). It only supports the classic `ESC *` (1B 2A) bit-image mode.
- * Sending `GS v 0` makes the printer dump the raw raster bytes as text →
- * gibberish on paper.
  *
- * IMPORTANT #2: With `ESC *`, the printer's `ESC a` (alignment) setting only
- * applies to the FIRST 24-pixel band — subsequent bands print left-aligned
- * regardless. To get a centered/right-aligned image we therefore CAN'T rely on
- * ESC a; we have to BAKE the alignment into the bitmap by padding each band
- * with white columns on the left. This way every band starts at column 0 from
- * the printer's perspective, but the actual image data is offset to give the
- * visual appearance of center/right alignment.
+ * IMPORTANT #2: ESC a (alignment) only applies until the next LF on DPP-450.
+ * Multi-band ESC * images therefore re-align to left after band 1. Fix: bake
+ * the alignment into the bitmap by adding empty (white) columns on the left.
  *
- * `ESC *` works column-by-column:
- *   - You select a density mode (m=33 = 24-dot triple-density, 200 DPI).
- *   - Then you send N columns × 3 bytes each (24 pixels per column).
- *   - Then LF to advance one full 24-pixel band.
- *   - Repeat until the whole bitmap is printed.
+ * IMPORTANT #3: Bluetooth Classic SPP has no real flow control above the link
+ * layer. If we dump the entire image into the socket in one big write, the
+ * printer's tiny internal buffer (~4-8 KB) overflows on tall images, drops
+ * raster bytes, and the next band's header gets parsed as raster data → garbage
+ * mid-print that "recovers" a few rows later when the parser re-syncs.
+ *
+ * Fix: we DON'T return a single byte[] anymore — we return a list of small
+ * chunks (one per band + header + footer). The caller (the React module) sends
+ * each chunk in a separate Bluetooth write with a small sleep between them so
+ * the printer has time to drain its buffer.
  */
 final class EscPosImage {
 
@@ -41,15 +42,21 @@ final class EscPosImage {
     private static final int LUMA_THRESHOLD = 160;
 
     /**
-     * @param base64            base64-encoded PNG/JPEG bytes
-     * @param requestedWidthDots  desired width of the actual image, in dots (≤ paperWidthDots)
-     * @param alignment           0=left, 1=center, 2=right
-     * @param paperWidthDots      total printable width on the paper. Used to compute
-     *                            left padding that visually aligns the image.
-     *                            Pass 0 or a negative value to disable padding (image
-     *                            prints at left, same width as requestedWidthDots).
+     * Result of rasterization: a sequence of byte chunks to be sent in order
+     * with a small pause between them.
      */
-    static byte[] rasterize(String base64, int requestedWidthDots, int alignment, int paperWidthDots)
+    static final class RasterizedImage {
+        final List<byte[]> chunks;
+        /** Recommended delay between chunks, in milliseconds. */
+        final int chunkDelayMs;
+
+        RasterizedImage(List<byte[]> chunks, int chunkDelayMs) {
+            this.chunks = chunks;
+            this.chunkDelayMs = chunkDelayMs;
+        }
+    }
+
+    static RasterizedImage rasterize(String base64, int requestedWidthDots, int alignment, int paperWidthDots)
             throws IOException {
         byte[] decoded = Base64.decode(base64, Base64.DEFAULT);
         Bitmap src = BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
@@ -73,7 +80,6 @@ final class EscPosImage {
         }
         if (scaled == null) throw new IOException("Failed to scale image");
 
-        // Pre-compute b/w grid for the IMAGE region only (no padding here).
         byte[][] grid = new byte[targetH][imageW];
         int[] row = new int[imageW];
         for (int y = 0; y < targetH; y++) {
@@ -95,10 +101,7 @@ final class EscPosImage {
         }
         try { scaled.recycle(); } catch (Throwable ignored) {}
 
-        // ── Compute alignment padding ───────────────────────────────────────
-        // If caller passes paperWidth, we add empty (white) columns on the left
-        // so the actual image appears centered or right-aligned regardless of
-        // how the printer interprets ESC a between bands.
+        // ── Alignment padding ───────────────────────────────────────────────
         int paddingLeft = 0;
         int totalW = imageW;
         if (paperWidthDots > imageW) {
@@ -110,49 +113,53 @@ final class EscPosImage {
             if (paddingLeft > 0) {
                 totalW = paddingLeft + imageW;
                 if (totalW > MAX_WIDTH_DOTS) {
-                    // Defensive: shouldn't happen because caller clamps imageW ≤ paperWidth ≤ MAX_WIDTH_DOTS.
                     totalW = MAX_WIDTH_DOTS;
                     if (paddingLeft >= totalW) paddingLeft = totalW - imageW;
                 }
             }
         }
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream(totalW * targetH / 4 + 256);
+        List<byte[]> chunks = new ArrayList<>();
 
-        // Zero left margin: GS L nL nH  (1D 4C 0 0)
-        out.write(0x1D); out.write(0x4C); out.write(0); out.write(0);
+        // ── Chunk 1: prologue (margin reset + alignment + line spacing) ─────
+        {
+            ByteArrayOutputStream prologue = new ByteArrayOutputStream(16);
+            // GS L 0 0 — left margin = 0
+            prologue.write(0x1D); prologue.write(0x4C); prologue.write(0); prologue.write(0);
+            // ESC a 0 — force left (we bake alignment into the bitmap)
+            prologue.write(0x1B); prologue.write(0x61); prologue.write(0);
+            // ESC 3 24 — line spacing matches band height
+            prologue.write(0x1B); prologue.write(0x33); prologue.write(BAND_HEIGHT);
+            chunks.add(prologue.toByteArray());
+        }
 
-        // ESC a 0  — alignment via ESC a doesn't work reliably across multiple
-        // ESC * bands on DPP-450, so we force left and bake the alignment into
-        // the bitmap below via paddingLeft.
-        out.write(0x1B); out.write(0x61); out.write(0);
-
-        // Line spacing = BAND_HEIGHT so consecutive bands stack perfectly.
-        out.write(0x1B); out.write(0x33); out.write(BAND_HEIGHT);
-
-        // nL/nH for ESC * is the total number of COLUMNS (padding + image).
         int nL = totalW & 0xFF;
         int nH = (totalW >> 8) & 0xFF;
 
-        // Walk the image in 24-pixel-tall bands.
+        // ── Chunks 2..N+1: one chunk per 24-pixel band ──────────────────────
+        // Each band chunk = [ESC * mode nL nH] [3*totalW data bytes] [LF].
+        // Size per band ≈ 5 + 3*totalW + 1 bytes. For totalW=832 → ~2.5 KB/band.
+        // We send each band in a separate Bluetooth write and let the React
+        // module sleep ~chunkDelayMs between them.
         for (int bandTop = 0; bandTop < targetH; bandTop += BAND_HEIGHT) {
             int bandBottom = Math.min(bandTop + BAND_HEIGHT, targetH);
+            ByteArrayOutputStream band = new ByteArrayOutputStream(5 + 3 * totalW + 1);
 
-            // ESC * m nL nH
-            out.write(0x1B);
-            out.write(0x2A);
-            out.write(ESC_STAR_MODE);
-            out.write(nL);
-            out.write(nH);
+            // Header
+            band.write(0x1B);
+            band.write(0x2A);
+            band.write(ESC_STAR_MODE);
+            band.write(nL);
+            band.write(nH);
 
-            // 1. Padding columns — all-zero bytes (3 per column = 24 white pixels each).
+            // Padding columns (all white)
             for (int p = 0; p < paddingLeft; p++) {
-                out.write(0);
-                out.write(0);
-                out.write(0);
+                band.write(0);
+                band.write(0);
+                band.write(0);
             }
 
-            // 2. Actual image columns.
+            // Image columns
             for (int x = 0; x < imageW; x++) {
                 int b0 = 0, b1 = 0, b2 = 0;
                 for (int dy = 0; dy < BAND_HEIGHT; dy++) {
@@ -168,19 +175,31 @@ final class EscPosImage {
                         }
                     }
                 }
-                out.write(b0);
-                out.write(b1);
-                out.write(b2);
+                band.write(b0);
+                band.write(b1);
+                band.write(b2);
             }
 
-            out.write(0x0A); // LF — advances exactly BAND_HEIGHT dots
+            // LF — advances exactly BAND_HEIGHT dots
+            band.write(0x0A);
+
+            chunks.add(band.toByteArray());
         }
 
-        // Restore default line spacing
-        out.write(0x1B); out.write(0x32);
-        // Reset alignment to left
-        out.write(0x1B); out.write(0x61); out.write(0x00);
+        // ── Final chunk: restore defaults ───────────────────────────────────
+        {
+            ByteArrayOutputStream epilogue = new ByteArrayOutputStream(8);
+            // ESC 2 — restore default line spacing
+            epilogue.write(0x1B); epilogue.write(0x32);
+            // ESC a 0 — left alignment for following text
+            epilogue.write(0x1B); epilogue.write(0x61); epilogue.write(0);
+            chunks.add(epilogue.toByteArray());
+        }
 
-        return out.toByteArray();
+        // 40 ms delay between bands is enough for the DPP-450 (200 mm/s thermal
+        // head needs ~12 ms to print one 24-dot band; the rest is BT processing
+        // headroom). Tune up to 80 ms if heavily corrupt; down to 20 ms if too slow.
+        int delay = 40;
+        return new RasterizedImage(chunks, delay);
     }
 }

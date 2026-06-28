@@ -225,6 +225,12 @@ public class BTClassicPrinterModule extends ReactContextBaseJavaModule {
     /**
      * Rasterize a PNG/JPEG (base64) to ESC/POS ESC * bit-image bytes and send.
      *
+     * The image is sent in MULTIPLE small Bluetooth writes (one per 24-pixel
+     * band) with a short delay between them. This is critical for DPP-450:
+     * Bluetooth Classic SPP has no real flow control, so a single big write
+     * overflows the printer's tiny internal buffer, drops raster bytes, and
+     * causes garbage "in the middle of the image, then recovery" artifacts.
+     *
      * @param widthDots       desired width of the actual image, in dots
      * @param alignment       0=left, 1=center, 2=right
      * @param paperWidthDots  total printable paper width in dots (e.g. 832 for DPP-450).
@@ -241,8 +247,25 @@ public class BTClassicPrinterModule extends ReactContextBaseJavaModule {
                     promise.resolve(true);
                     return;
                 }
-                byte[] escposBytes = EscPosImage.rasterize(base64, widthDots, alignment, paperWidthDots);
-                BTConnectionManager.get().write(escposBytes);
+                EscPosImage.RasterizedImage img =
+                        EscPosImage.rasterize(base64, widthDots, alignment, paperWidthDots);
+                BTConnectionManager mgr = BTConnectionManager.get();
+                final int delay = img.chunkDelayMs;
+                for (int i = 0; i < img.chunks.size(); i++) {
+                    byte[] chunk = img.chunks.get(i);
+                    mgr.write(chunk);
+                    // Pause between chunks so the printer can drain its buffer.
+                    // No delay needed before the very first chunk (prologue) or
+                    // after the last one.
+                    if (delay > 0 && i + 1 < img.chunks.size()) {
+                        try {
+                            Thread.sleep(delay);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Print interrupted", ie);
+                        }
+                    }
+                }
                 promise.resolve(true);
             } catch (IOException ioe) {
                 promise.reject("BT_IMG_WRITE_FAIL", ioe.getMessage(), ioe);
