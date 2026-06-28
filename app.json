@@ -2,7 +2,7 @@
   "expo": {
     "name": "Parko Control",
     "slug": "Parko-Control",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "scheme": "parko-control",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,14 +12,14 @@
       "resizeMode": "cover",
       "backgroundColor": "#890350"
     },
-    "runtimeVersion": "1.2.1",
+    "runtimeVersion": "1.2.2",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parkocontrol.bordeac03",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
 		"UIViewControllerBasedStatusBarAppearance": true,
 		"NSBluetoothAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to connect to Bluetooth receipt printers.",
@@ -32,7 +32,7 @@
         "backgroundColor": "#890350"
       },
       "package": "com.parkocontrol.bordeac03",
-      "versionCode": 4,
+      "versionCode": 5,
     "softwareKeyboardLayoutMode": "pan",
     "permissions": [
         "android.permission.BLUETOOTH",
