@@ -223,19 +223,25 @@ public class BTClassicPrinterModule extends ReactContextBaseJavaModule {
     }
 
     /**
-     * Rasterize a PNG/JPEG (base64) to ESC/POS GS v 0 raster bytes and send.
-     * widthDots is rounded down to a multiple of 8 as required by ESC/POS raster mode.
-     * alignment: 0=left, 1=center, 2=right.
+     * Rasterize a PNG/JPEG (base64) to ESC/POS ESC * bit-image bytes and send.
+     *
+     * @param widthDots       desired width of the actual image, in dots
+     * @param alignment       0=left, 1=center, 2=right
+     * @param paperWidthDots  total printable paper width in dots (e.g. 832 for DPP-450).
+     *                        Required to bake the alignment into the bitmap as
+     *                        white padding columns on the left — ESC a alone
+     *                        does NOT work across multi-band ESC * images on DPP-450.
+     *                        Pass 0 to disable padding (image will print left-aligned).
      */
     @ReactMethod
-    public void printImageBase64(String base64, int widthDots, int alignment, Promise promise) {
+    public void printImageBase64(String base64, int widthDots, int alignment, int paperWidthDots, Promise promise) {
         mIo.execute(() -> {
             try {
                 if (base64 == null || base64.isEmpty()) {
                     promise.resolve(true);
                     return;
                 }
-                byte[] escposBytes = EscPosImage.rasterize(base64, widthDots, alignment);
+                byte[] escposBytes = EscPosImage.rasterize(base64, widthDots, alignment, paperWidthDots);
                 BTConnectionManager.get().write(escposBytes);
                 promise.resolve(true);
             } catch (IOException ioe) {

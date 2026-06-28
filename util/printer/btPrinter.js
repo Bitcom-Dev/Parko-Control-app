@@ -293,7 +293,13 @@ class BluetoothPrinter {
 		await BTClassicPrinter.writeBase64(String(base64 || ''));
 	}
 
-	async printImageBase64(base64, widthDots, alignment) {
+	/**
+	 * @param paperWidthDots total printable paper width (e.g. 832 for DPP-450).
+	 *                       Used to bake center/right alignment into the bitmap
+	 *                       as left-padding columns — because ESC a alone does
+	 *                       NOT work across multi-band ESC * images.
+	 */
+	async printImageBase64(base64, widthDots, alignment, paperWidthDots) {
 		if (!nativeAvailable) throw new Error('Bluetooth printer module not available.');
 		if (this._status !== 'connected' && this._status !== 'printing') {
 			throw new Error('Printer is not connected.');
@@ -302,6 +308,7 @@ class BluetoothPrinter {
 			String(base64 || ''),
 			Number(widthDots) || 384,
 			Number(alignment) || 0,
+			Number(paperWidthDots) || 0,
 		);
 	}
 }

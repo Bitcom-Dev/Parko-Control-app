@@ -301,7 +301,9 @@ const sendBlocksToPrinter = async ({ blocks, maxDots, getCachedImageSize, msg })
 			const maxW = maxDots ? Math.min(requestedW || maxDots, maxDots) : (requestedW || maxDots);
 			const safeW = clampInt(roundDownToMultiple(maxW, 8) || maxW, 48, Math.min(maxW || 576, 576));
 			const alignInt = b.align === 'center' ? 1 : b.align === 'right' ? 2 : 0;
-			await btPrinter.printImageBase64(base64, safeW, alignInt);
+			// Pass maxDots as the paper width so the native side can bake center/right
+			// alignment into the bitmap (ESC a alone doesn't propagate across multi-band ESC *).
+			await btPrinter.printImageBase64(base64, safeW, alignInt, maxDots);
 			// The native side resets ALIGN to 0 after the image, so the next
 			// text line that we flush will re-emit its own ALIGN unconditionally
 			// (see buildTextStream above) — no manual reset needed here.
