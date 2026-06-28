@@ -276,7 +276,12 @@
       "contentLabel": "content",
       "pxPerDotLabel": "px/dot",
       "reconnect": "Reconnect",
-      "imageTag": "IMG"
+      "imageTag": "IMG",
+      "printingNow": "Printing…",
+      "printerNotConnectedMsg": "Printer is not connected. Please connect it first.",
+      "pairFirstHint": "Pair the printer first in Android Settings → Bluetooth, then refresh this list.",
+      "noPairedDevices": "No paired Bluetooth devices found.",
+      "pairInSettingsHint": "Pair your printer in Android Settings first."
     }
   },
   "ro": {
@@ -556,7 +561,12 @@
       "contentLabel": "conținut",
       "pxPerDotLabel": "px/dot",
       "reconnect": "Reconectează",
-      "imageTag": "IMG"
+      "imageTag": "IMG",
+      "printingNow": "Se printează…",
+      "printerNotConnectedMsg": "Imprimanta nu este conectată. Conecteaz-o întâi.",
+      "pairFirstHint": "Asociază imprimanta din Setări Android → Bluetooth, apoi reîncarcă lista.",
+      "noPairedDevices": "Nu s-au găsit dispozitive Bluetooth asociate.",
+      "pairInSettingsHint": "Asociază imprimanta în Setări Android întâi."
     }
   }
 }
