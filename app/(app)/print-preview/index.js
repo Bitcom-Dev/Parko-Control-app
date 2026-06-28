@@ -16,7 +16,6 @@ import {
 	Modal, FlatList, Platform, Alert, StyleSheet,
 } from 'react-native';
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Buffer } from 'buffer';
 
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +29,8 @@ import { wordWrapByDots } from '../../../util/printer/wordWrapByDots';
 
 import btPrinter, { useBtPrinter } from '../../../util/printer/btPrinter';
 import {
-	encodeTextCp852, startupBytes, ALIGN, BOLD, UNDERLINE, SIZE, FONT, RESET_STYLE, LF, toBase64,
+	encodeTextCp852, startupBytes, ALIGN, BOLD, UNDERLINE, SIZE, FONT, RESET_STYLE, LF,
+	toBase64, concatBytes, uint8ToBase64,
 } from '../../../util/printer/escposEncoding';
 
 const DEFAULT_DOTS = 832;
@@ -286,12 +286,16 @@ const sendBlocksToPrinter = async ({ blocks, maxDots, getCachedImageSize, msg })
 	const flushText = async () => {
 		if (textBufBlocks.length === 0) return;
 		const stream = buildTextStream(textBufBlocks);
-		// Chunk into ~512-byte packets to keep individual writes small.
-		const fullBuf = Buffer.concat(stream.map((c) => Buffer.isBuffer(c) ? c : Buffer.from(c)));
+		// Concat into a single Uint8Array, then chunk into ~512-byte packets.
+		const fullBuf = concatBytes(stream);
 		const CHUNK = 512;
 		for (let i = 0; i < fullBuf.length; i += CHUNK) {
-			const piece = fullBuf.subarray(i, Math.min(i + CHUNK, fullBuf.length));
-			await btPrinter.writeBase64(piece.toString('base64'));
+			const end = Math.min(i + CHUNK, fullBuf.length);
+			// Copy the slice into a fresh Uint8Array — avoids any prototype/byteOffset issues
+			// from .subarray() on RN's polyfilled Buffer/Uint8Array.
+			const piece = new Uint8Array(end - i);
+			for (let j = i, k = 0; j < end; j++, k++) piece[k] = fullBuf[j];
+			await btPrinter.writeBase64(uint8ToBase64(piece));
 		}
 		textBufBlocks = [];
 	};
@@ -317,7 +321,7 @@ const sendBlocksToPrinter = async ({ blocks, maxDots, getCachedImageSize, msg })
 	await flushText();
 
 	// 3. Feed paper + reset style.
-	await btPrinter.writeBase64(toBase64(Buffer.concat([LF, LF, LF, RESET_STYLE])));
+	await btPrinter.writeBase64(toBase64(concatBytes([LF, LF, LF, RESET_STYLE])));
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
