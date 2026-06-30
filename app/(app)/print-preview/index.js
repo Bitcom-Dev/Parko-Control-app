@@ -16,6 +16,7 @@ import {
 	Modal, FlatList, Platform, Alert, StyleSheet,
 } from 'react-native';
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -345,6 +346,10 @@ const PrintPreviewScreen = () => {
 
 	// Subscribe to the printer singleton — UI re-renders on every status change.
 	const printer = useBtPrinter();
+
+	// Bottom safe-area inset — covers Android gesture bar / 3-button navbar so the
+	// Print/Reconnect buttons don't end up under the system navigation overlay.
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => { setData(getPrintPreview()); }, []);
 
@@ -754,7 +759,7 @@ const PrintPreviewScreen = () => {
 			</ScrollView>
 
 			{/* ── Bottom bar: connection status + buttons ───────────────────── */}
-			<View style={styles.bottomBar}>
+			<View style={[styles.bottomBar, { paddingBottom: resize(16) + (insets.bottom || 0) }]}>
 				<View style={styles.connectionRow}>
 					<View style={[styles.connectionDot, statusDotStyle]} />
 					<CustomTextMedium style={styles.connectionText}>{statusText}</CustomTextMedium>
@@ -807,10 +812,12 @@ const s = StyleSheet.create({
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: lightOrange },
 	scroll: { flex: 1, width: '100%' },
-	scrollContent: { paddingVertical: resize(14), paddingBottom: resize(110), alignItems: 'center' },
+	scrollContent: { paddingVertical: resize(14), paddingBottom: resize(160), alignItems: 'center' },
 	bottomBar: {
 		position: 'absolute', left: 0, right: 0, bottom: 0,
-		paddingHorizontal: resize(14), paddingTop: resize(12), paddingBottom: resize(16),
+		paddingHorizontal: resize(14), paddingTop: resize(12),
+		// paddingBottom is applied inline via useSafeAreaInsets() so the bar lifts above
+		// the Android gesture pill / 3-button navbar without overlap.
 		backgroundColor: 'rgba(255,243,231,0.97)',
 		borderTopLeftRadius: resize(18), borderTopRightRadius: resize(18),
 		shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 6,
